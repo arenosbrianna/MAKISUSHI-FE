@@ -10,11 +10,15 @@ import { PurchasingPage } from './dss/pages/PurchasingPage';
 import { TrackingPage } from './dss/pages/TrackingPage';
 import { NotFoundPage } from './pages/NotFoundPage';
 
+// The dashboard bundles its full dataset (~2.6 MB), so it loads only when its route is opened.
+const MakisushiDashboard = React.lazy(() => import('./makisushi/MakisushiDashboard'));
+
 export const App: React.FC = () => (
   <DssProvider>
     <BrowserRouter>
       <Routes>
         <Route path="/login" element={<LoginPage />} />
+        <Route path="/makisushi" element={<React.Suspense fallback={null}><MakisushiDashboard /></React.Suspense>} />
         <Route path="/" element={<Shell />}>
           <Route index element={<OverviewPage />} />
           <Route path="forecasting" element={<ForecastPage />} />
