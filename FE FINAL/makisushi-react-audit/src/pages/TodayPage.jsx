@@ -144,7 +144,7 @@ function PlanWorking() {
             {row("Stockout episodes", P.episodes, H.episodes, num, true)}
             {row("Expiry a year", P.expiry, H.expiry, peso, true)}
             {row("Average stock held", P.avgStock, H.avgStock, peso, true)}
-            {row("Demand met from stock", P.fill, H.fill, (v) => pct(v, 1), false)}
+            {row("Fill rate", P.fill, H.fill, (v) => pct(v, 1), false)}
           </tbody>
         </table>
       </div>

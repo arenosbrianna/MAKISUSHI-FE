@@ -152,8 +152,10 @@ export function SalesPage({ F }) {
     });
   });
   const stackUsed = stackSeries.filter((x) => sum(x.vals) > 0);
-  const donutTop = byCat.slice(0, 5).map((k) => [cats[k], catNow[k]]);
-  const donutRest = sum(byCat.slice(5).map((k) => catNow[k]));
+  // the five biggest categories, and every other category together as Other (the shares add up to all of the net sales)
+  const catRank = Object.keys(catNow).map(Number).sort((x, y) => catNow[y] - catNow[x]);
+  const donutTop = catRank.slice(0, 5).map((k) => [cats[k], catNow[k]]);
+  const donutRest = sum(catRank.slice(5).map((k) => catNow[k]));
   if (donutRest > 0) donutTop.push(["Other", donutRest]);
 
   return (
