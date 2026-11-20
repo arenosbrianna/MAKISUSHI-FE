@@ -1,0 +1,235 @@
+{
+"period": "7 Sep 2025 to 8 Sep 2026",
+"historical": {
+"episodes": 296,
+"days": 407,
+"expiry": 11905,
+"net_cost": 990329,
+"fill": 0.973,
+"avg_stock": 27447,
+"purchases": 893463
+},
+"levels": [
+{
+"level": 0.8,
+"episodes": 180,
+"days": 264,
+"expiry": 9076.57,
+"net_cost": 978169.36,
+"fill": 0.975,
+"avg_stock": 22104.13,
+"purchases": 864011.56,
+"orders_cut": 0
+},
+{
+"level": 0.81,
+"episodes": 175,
+"days": 260,
+"expiry": 9500.81,
+"net_cost": 973722.69,
+"fill": 0.9761,
+"avg_stock": 22150.8,
+"purchases": 865821.03,
+"orders_cut": 0
+},
+{
+"level": 0.82,
+"episodes": 176,
+"days": 253,
+"expiry": 9859.04,
+"net_cost": 971203.31,
+"fill": 0.9772,
+"avg_stock": 22125.91,
+"purchases": 867079.34,
+"orders_cut": 0
+},
+{
+"level": 0.83,
+"episodes": 169,
+"days": 240,
+"expiry": 10066.77,
+"net_cost": 966925.61,
+"fill": 0.9785,
+"avg_stock": 22357.61,
+"purchases": 869784.12,
+"orders_cut": 0
+},
+{
+"level": 0.84,
+"episodes": 163,
+"days": 234,
+"expiry": 10465.56,
+"net_cost": 963585.02,
+"fill": 0.9795,
+"avg_stock": 22480.11,
+"purchases": 870672.09,
+"orders_cut": 0
+},
+{
+"level": 0.85,
+"episodes": 159,
+"days": 226,
+"expiry": 10766.46,
+"net_cost": 962792.42,
+"fill": 0.9798,
+"avg_stock": 22668.7,
+"purchases": 870645.72,
+"orders_cut": 0
+},
+{
+"level": 0.86,
+"episodes": 153,
+"days": 217,
+"expiry": 11173.05,
+"net_cost": 956339.84,
+"fill": 0.9812,
+"avg_stock": 22766.69,
+"purchases": 872109.2,
+"orders_cut": 0
+},
+{
+"level": 0.87,
+"episodes": 145,
+"days": 204,
+"expiry": 11519.09,
+"net_cost": 952122.42,
+"fill": 0.9824,
+"avg_stock": 22920.47,
+"purchases": 874322.58,
+"orders_cut": 0
+},
+{
+"level": 0.88,
+"episodes": 141,
+"days": 194,
+"expiry": 11812.19,
+"net_cost": 951193.67,
+"fill": 0.9829,
+"avg_stock": 23053.7,
+"purchases": 874936.17,
+"orders_cut": 0
+},
+{
+"level": 0.89,
+"episodes": 129,
+"days": 170,
+"expiry": 12456.2,
+"net_cost": 946101.26,
+"fill": 0.9844,
+"avg_stock": 23360.68,
+"purchases": 877340.23,
+"orders_cut": 0
+},
+{
+"level": 0.9,
+"episodes": 125,
+"days": 169,
+"expiry": 13396.03,
+"net_cost": 947180.27,
+"fill": 0.9843,
+"avg_stock": 23543.74,
+"purchases": 878014.95,
+"orders_cut": 0
+},
+{
+"level": 0.91,
+"episodes": 126,
+"days": 163,
+"expiry": 14068.31,
+"net_cost": 943939.66,
+"fill": 0.9851,
+"avg_stock": 23759.3,
+"purchases": 879916.14,
+"orders_cut": 0
+},
+{
+"level": 0.92,
+"episodes": 121,
+"days": 155,
+"expiry": 15034.48,
+"net_cost": 943548.55,
+"fill": 0.9858,
+"avg_stock": 23957.96,
+"purchases": 880728.89,
+"orders_cut": 0
+},
+{
+"level": 0.93,
+"episodes": 112,
+"days": 139,
+"expiry": 15796.47,
+"net_cost": 941333.18,
+"fill": 0.987,
+"avg_stock": 24260.78,
+"purchases": 882379.1,
+"orders_cut": 0
+},
+{
+"level": 0.94,
+"episodes": 108,
+"days": 132,
+"expiry": 17024.85,
+"net_cost": 938797.11,
+"fill": 0.9878,
+"avg_stock": 24622.78,
+"purchases": 884259.02,
+"orders_cut": 0
+},
+{
+"level": 0.95,
+"episodes": 94,
+"days": 115,
+"expiry": 18250.41,
+"net_cost": 937887.29,
+"fill": 0.9891,
+"avg_stock": 24864.93,
+"purchases": 885970.35,
+"orders_cut": 0
+},
+{
+"level": 0.96,
+"episodes": 78,
+"days": 94,
+"expiry": 19492.9,
+"net_cost": 931940.17,
+"fill": 0.9911,
+"avg_stock": 25306.96,
+"purchases": 889961.93,
+"orders_cut": 0
+},
+{
+"level": 0.97,
+"episodes": 64,
+"days": 78,
+"expiry": 21370.36,
+"net_cost": 924156.58,
+"fill": 0.993,
+"avg_stock": 25574.3,
+"purchases": 894575.41,
+"orders_cut": 0
+},
+{
+"level": 0.98,
+"episodes": 51,
+"days": 62,
+"expiry": 24670.93,
+"net_cost": 925211.22,
+"fill": 0.9943,
+"avg_stock": 25866.9,
+"purchases": 899662.73,
+"orders_cut": 1
+},
+{
+"level": 0.99,
+"episodes": 33,
+"days": 38,
+"expiry": 30575.86,
+"net_cost": 927491.54,
+"fill": 0.9953,
+"avg_stock": 26986.74,
+"purchases": 906646.25,
+"orders_cut": 2
+}
+],
+"note": "Backtest of the ordering rule on the test year at each service level, Balanced waste penalty, Base budget PHP 87,000 a month (Chapter 4, Section 4.2.3.3)."
+}

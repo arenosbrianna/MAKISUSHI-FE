@@ -1,0 +1,38 @@
+/* ---- sign-in page (ported from the React branch's dss.css; sized down so the box is not too large) ---- */
+.login-root { display: flex; flex-wrap: wrap; min-height: 100vh; overflow-x: hidden; }
+
+.login-main { overflow: hidden; flex: 1 1 100%; min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 32px 24px; position: relative; background: #F6F6F3; }
+.login-wrap { position: relative; z-index: 1; width: min(380px, 100%); display: flex; flex-direction: column; gap: 16px; align-items: center; animation: login-rise .6s ease-out both; }
+.login-logo { height: 76px; width: auto; max-width: 100%; }
+.login-product { margin: -6px 0 0; font-size: 15px; font-weight: 800; letter-spacing: .14em; text-transform: uppercase; color: #1E3A8A; text-align: center; }
+
+.login-card { position: relative; width: 100%; background: #FFFFFF; border: 1px solid #E7E5E0; border-radius: 18px; padding: 26px 24px 24px; display: flex; flex-direction: column; gap: 14px; box-shadow: 0 1px 0 rgba(30, 58, 138, .06), 0 24px 48px -24px rgba(30, 58, 138, .35); overflow: hidden; }
+.login-head { display: flex; flex-direction: column; gap: 6px; }
+.login-head h1 { font-size: 26px; font-weight: 800; letter-spacing: -0.025em; color: #111827; line-height: 1.1; }
+.login-error { background: #FEF2F2; border: 1px solid #FCA5A5; border-radius: 10px; padding: 9px 12px; font-size: 13px; font-weight: 600; color: #991B1B; animation: login-shake .35s ease-in-out; }
+
+.login-field { display: flex; flex-direction: column; gap: 6px; }
+.login-input-wrap { position: relative; display: block; }
+.login-icon { position: absolute; left: 13px; top: 50%; transform: translateY(-50%); color: #64748B; display: flex; pointer-events: none; }
+.login-input { width: 100%; height: 44px; border: 1.5px solid #CBD5E1; border-radius: 12px; background: #F8FAFC; padding: 0 12px 0 40px; font: inherit; font-size: 14px; color: #111827; transition: border-color .15s, box-shadow .15s, background .15s; }
+.login-input:hover { border-color: #94A3B8; }
+.login-input:focus { outline: none; border-color: #1E3A8A; background: #FFFFFF; box-shadow: 0 0 0 4px #E0E7FF; }
+.login-eye { position: absolute; right: 5px; top: 50%; transform: translateY(-50%); width: 34px; height: 34px; border: 0; border-radius: 8px; background: transparent; color: #475569; display: flex; align-items: center; justify-content: center; cursor: pointer; }
+.login-eye:hover { background: #EEF2FF; color: #1E3A8A; }
+.login-eye:focus-visible { outline: 3px solid #93C5FD; outline-offset: 1px; }
+.login-submit { margin-top: 2px; height: 46px; border: 0; border-radius: 12px; background: #1E3A8A; color: #FFFFFF; font: inherit; font-size: 15px; font-weight: 800; display: flex; align-items: center; justify-content: center; gap: 10px; cursor: pointer; box-shadow: 0 14px 24px -14px rgba(30, 58, 138, .9); transition: transform .15s, box-shadow .15s, filter .15s; }
+.login-submit:hover:not(:disabled) { transform: translateY(-1px); box-shadow: 0 18px 28px -14px rgba(30, 58, 138, 1); filter: brightness(1.08); }
+.login-submit:focus-visible { outline: 3px solid #93C5FD; outline-offset: 2px; }
+.login-submit:disabled { opacity: .55; cursor: not-allowed; box-shadow: none; }
+
+@keyframes login-rise { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: none; } }
+@keyframes login-shake { 0%, 100% { transform: translateX(0); } 25% { transform: translateX(-5px); } 75% { transform: translateX(5px); } }
+@media (prefers-reduced-motion: reduce) { .login-wrap, .login-error { animation: none; } .login-submit { transition: none; } }
+
+.login-art { position: absolute; inset: 0; pointer-events: none; overflow: hidden; }
+.login-art .art { position: absolute; opacity: .92; filter: drop-shadow(0 10px 10px rgba(30, 41, 59, .16)); }
+@media (max-width: 760px) { .login-art .art-hide-m { display: none; } .login-art .art { opacity: .6; width: 78px; height: auto; } }
+
+/* Login label, scoped so it does not touch the dashboard styles. */
+.login-field .lbl { font-size: 13px; font-weight: 700; color: #374151; }
+.login-input::-ms-reveal, .login-input::-ms-clear { display: none; }

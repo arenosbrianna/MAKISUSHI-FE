@@ -1,0 +1,21 @@
+/* Recharts charts: same text, colours and tooltip look as the original SVG charts.
+   The original styles in styles.css are unchanged. */
+.rc { position: relative; width: 100%; }
+.rc svg { display: block; overflow: visible; }
+.rc text { font-family: var(--font); fill: var(--muted); font-size: 11px; }
+.rc .recharts-cartesian-axis-line,
+.rc .recharts-cartesian-axis-tick-line { stroke: var(--line); }
+.rc .recharts-reference-line line { stroke-width: 1; }
+.rc .recharts-tooltip-wrapper { z-index: 50; pointer-events: none; }
+.rc-tip {
+  background: var(--ink);
+  color: var(--bg);
+  font-size: 12px;
+  padding: 6px 9px;
+  border-radius: 8px;
+  max-width: 240px;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.25);
+  font-variant-numeric: tabular-nums;
+  line-height: 1.4;
+}
+.rc-tip b { display: block; margin-bottom: 2px; }

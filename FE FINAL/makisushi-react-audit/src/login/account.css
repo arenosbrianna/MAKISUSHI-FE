@@ -1,0 +1,11 @@
+/* Account menu in the top-right corner, ported from the React branch's header (inline styles turned into classes). */
+.acct { position: relative; }
+.acct-btn { display: inline-flex; align-items: center; gap: 8px; background: none; border: 0; padding: 4px 6px; border-radius: 10px; cursor: pointer; font: inherit; color: inherit; }
+.acct-btn:focus-visible { outline: 3px solid #93C5FD; outline-offset: 2px; }
+.acct-name { font-size: 14px; font-weight: 600; color: #374151; }
+.acct-caret { font-size: 10px; color: #4B5563; }
+.acct-menu { position: absolute; right: 0; top: calc(100% + 6px); z-index: 50; width: 208px; background: #FFFFFF; border: 1px solid #E7E5E0; border-radius: 12px; padding: 8px; box-shadow: 0 12px 24px -8px rgba(15, 23, 42, .2); }
+.acct-who { padding: 8px 10px; font-size: 12px; color: #4B5563; border-bottom: 1px solid #EDEBE6; }
+.acct-who strong { color: #111827; }
+.acct-out { width: 100%; text-align: left; margin-top: 6px; padding: 10px; border: 0; border-radius: 8px; background: none; font: inherit; font-size: 14px; font-weight: 700; color: #B91C1C; cursor: pointer; }
+.acct-out:focus-visible { outline: 3px solid #93C5FD; outline-offset: 1px; }
