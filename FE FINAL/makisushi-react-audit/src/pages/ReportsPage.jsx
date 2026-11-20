@@ -2,7 +2,7 @@
 // and download it as a PDF (the chart and the whole table) or as a spreadsheet (CSV). Reports that cover a period follow the Period filter.
 import { useRef } from "react";
 import { D, LAST, BYID, ING, win, fd, fiso, series, wasteIn, purchaseValue, firstArrival, staffPerDay, isWalkin } from "../lib/model.js";
-import { peso, kpeso, num, pct, qty, sum } from "../lib/format.js";
+import { peso, kpeso, num, pct, qty, sum, packQty } from "../lib/format.js";
 import { Info } from "../components/ui.jsx";
 import { Icon } from "../components/Icons.jsx";
 import { HBars, ComboChart, Donut, rankWithShare } from "../components/Charts.jsx";
@@ -39,7 +39,7 @@ function buildReports(F, S) {
   {
     const lines = D.plan.filter((p) => set_.has(p.ing) && p.qty > 0).sort((a, b) => (BYID[a.ing].supname < BYID[b.ing].supname ? -1 : BYID[a.ing].supname > BYID[b.ing].supname ? 1 : a.week - b.week));
     const rows = [["Week", "Supplier", "Contact", "Ingredient", "Packs", "Pack size", "Quantity", "Unit", "Cost (PHP)", "Delivery", "How"],
-      ...lines.map((p) => { const i = BYID[p.ing], a = firstArrival(p.ing, p.week); return [p.week, i.supname, isWalkin(i) ? "walk-in grocery" : i.contact, i.name, p.packs, qty(i.pack, i.uom), Math.round(p.qty), i.uom, Math.round(p.cost), a || "", isWalkin(i) ? "buy in store" : "order from supplier"]; })];
+      ...lines.map((p) => { const i = BYID[p.ing], a = firstArrival(p.ing, p.week); return [p.week, i.supname, isWalkin(i) ? "walk-in grocery" : i.contact, i.name, p.packs, packQty(i.pack, i.uom), Math.round(p.qty), i.uom, Math.round(p.cost), a || "", isWalkin(i) ? "buy in store" : "order from supplier"]; })];
     const by = {};
     lines.forEach((p) => { by[p.ing] = (by[p.ing] || 0) + p.cost; });
     const items = Object.entries(by).map(([id, v]) => [BYID[id].name, v, +id]).sort((a, b) => b[1] - a[1]).slice(0, 12);
@@ -138,7 +138,7 @@ function buildReports(F, S) {
   {
     const list = ING.filter((i) => set_.has(i.id)).sort((a, b) => (a.supname < b.supname ? -1 : a.supname > b.supname ? 1 : a.name < b.name ? -1 : 1));
     const rows = [["Supplier", "Contact", "Ingredient", "Pack", "Price per pack (PHP)", "Minimum order (packs)", "Delivery"],
-      ...list.map((i) => [i.supname, isWalkin(i) ? "walk-in grocery" : i.contact, i.name, qty(i.pack, i.uom), Math.round(i.cost * i.pack * 100) / 100, i.minpacks, isWalkin(i) ? "walk-in" : i.lead === 0 ? "same day" : i.lead + " day" + (i.lead === 1 ? "" : "s") + " after ordering"])];
+      ...list.map((i) => [i.supname, isWalkin(i) ? "walk-in grocery" : i.contact, i.name, packQty(i.pack, i.uom), Math.round(i.cost * i.pack * 100) / 100, i.minpacks, isWalkin(i) ? "walk-in" : i.lead === 0 ? "same day" : i.lead + " day" + (i.lead === 1 ? "" : "s") + " after ordering"])];
     const bySup = {};
     list.forEach((i) => { bySup[i.supname] = (bySup[i.supname] || 0) + 1; });
     out.push({ id: "prices", title: "Supplier price list", desc: "Each supplier's items, pack sizes, prices and minimum orders.", rows, file: "supplier_prices",

@@ -9,5 +9,7 @@ export const daysTxt = (d) => (d <= 0 ? "0" : d < 1 ? "<1" : num(Math.round(d)))
 export const qty = (q, uom) => uom === "g"
   ? (q >= 1000 ? num(q / 1000, 1) + " kg" : num(q) + " g")
   : whole(q) + (uom === "pc" ? (Math.round(q) === 1 ? " pc" : " pcs") : (Math.round(q) === 1 ? " serving" : " servings"));
+// a pack size shown as a round number: grams to the nearest 100 (980 g -> 1 kg, 460 g -> 500 g), under 100 g to the nearest 50
+export const packQty = (q, uom) => qty(uom === "g" ? (q >= 100 ? Math.round(q / 100) * 100 : Math.max(50, Math.round(q / 50) * 50)) : Math.round(q), uom);
 export const sum = (a) => a.reduce((x, y) => x + y, 0);
 export const csvCell =(v) => { const s = String(v == null ? "" : v); return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; };

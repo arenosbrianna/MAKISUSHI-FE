@@ -1,7 +1,7 @@
 // Daily prep: what to thaw, prepare or top up for tomorrow. A cover chart (stock against need) and a short table; the detail
 // (supplier, pack, minimum order, dishes and staff meals) is in the hover on each line.
 import { D, LAST, series, dishUnits, staffPerDay, forecastHasStaff, isWalkin, planRow } from "../lib/model.js";
-import { peso, num, qty, pct, sum } from "../lib/format.js";
+import { peso, num, qty, pct, sum, packQty } from "../lib/format.js";
 import { Kpi, Kpis, Chip } from "../components/ui.jsx";
 import { HBars } from "../components/Charts.jsx";
 import { cleanName } from "../lib/upload.js";
@@ -106,7 +106,7 @@ export function PrepTable({ F }) {
                 const a = todo(r), c = dishCheck(r), t = r.top[0];
                 const staffTxt = r.staff > 0 ? ` · dishes ${qty(nice(r.dishNeed, r.i.uom, true), r.i.uom)} + staff meals ${qty(nice(r.staff, r.i.uom, true), r.i.uom)}` : "";
                 const promoTxt = c.push && r.push ? ` · promote ${cleanName(r.push.d.name)}: ${peso(r.extra)} of ${r.i.name} (${Math.round(r.extraShare * 100)}% of the stock) will not be used before it expires; best margin ${peso(r.push.margin)} a plate` : "";
-                const tip = `${r.i.supname} · pack ${qty(r.i.pack, r.i.uom)} · minimum ${r.i.minpacks || 1} ${(r.i.minpacks || 1) === 1 ? "pack" : "packs"}${staffTxt}${promoTxt}`;
+                const tip = `${r.i.supname} · pack ${packQty(r.i.pack, r.i.uom)} · minimum ${r.i.minpacks || 1} ${(r.i.minpacks || 1) === 1 ? "pack" : "packs"}${staffTxt}${promoTxt}`;
                 return (
                   <tr key={r.i.id} data-t={tip}>
                     <td><b>{r.i.name}</b></td>

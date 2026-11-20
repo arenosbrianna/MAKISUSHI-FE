@@ -1,7 +1,9 @@
 // Expiry and waste: how much stock expires in the coming days and where waste comes from. Alerts for batches close to
 // expiry (and the dishes to push) are sent through Telegram, not shown here. Where waste comes from (spoilage and expiry are kept apart, never added together).
-import { D, LAST, BYID, MON, dateOf, win, wasteIn, batchesAt, weeksFrom, bucketsFor, purchaseValue } from "../lib/model.js";
-import { peso, num, pct, sum } from "../lib/format.js";
+import { useState } from "react";
+import { D, LAST, BYID, MON, dateOf, dtxt, fd, win, wasteIn, batchesAt, weeksFrom, bucketsFor, purchaseValue } from "../lib/model.js";
+import { peso, num, pct, sum, qty } from "../lib/format.js";
+import { tabOf } from "../lib/constants.js";
 import { StackCols, HBars, StackH } from "../components/Charts.jsx";
 import { Info, Kpi, Kpis, deltaEl } from "../components/ui.jsx";
 import { useApp } from "../AppContext.js";
@@ -66,8 +68,56 @@ function WasteKpis({ F }) {
   );
 }
 
+// When each piece of waste happened: one line per record of the waste log, newest first, for the period and ingredients chosen above
+function WasteWhen({ F }) {
+  const { S, set } = useApp();
+  const [kind, setKind] = useState("all");   // all records, only spoiled, or only expired
+  const w = win(S), set_ = new Set(F.map((i) => i.id));
+  const inPeriod = wasteIn(set_, w.a, w.b);
+  const isExp = (x) => /expir/i.test(D.reasons[x[4]] || "");
+  const nExp = inPeriod.filter(isExp).length, nSpo = inPeriod.length - nExp;
+  const W = inPeriod.filter((x) => kind === "all" || (kind === "expired" ? isExp(x) : !isExp(x))).sort((a, b) => b[0] - a[0] || b[2] - a[2]);
+  const reasonName = (x) => { const r = D.reasons[x[4]] || ""; return /expir/i.test(r) ? "Expired" : /spoil/i.test(r) ? "Spoiled" : r[0].toUpperCase() + r.slice(1).replace(/_/g, " "); };
+  const total = sum(W.map((x) => x[2]));
+  return (
+    <div className="panel c12">
+      <div className="ph">
+        <h2>When it was wasted</h2>
+        <Info t="Each line is one record of the waste log: the day the ingredient was thrown out, why, how much, and what it cost at standard cost. Newest first, for the period and ingredients chosen above. Expired means it was kept past its shelf life; Spoiled means it went bad before then." />
+        <div className="seg noprint" id="wasteseg" role="group" aria-label="Type of waste" style={{ marginLeft: "auto" }}>
+          <button aria-pressed={kind === "all"} onClick={() => setKind("all")}>All · {num(inPeriod.length)}</button>
+          <button aria-pressed={kind === "spoiled"} onClick={() => setKind("spoiled")}>Spoiled · {num(nSpo)}</button>
+          <button aria-pressed={kind === "expired"} onClick={() => setKind("expired")}>Expired · {num(nExp)}</button>
+        </div>
+        <span className="t-flat">{W.length ? `${num(W.length)} records · ${peso(total)}` : ""}</span>
+      </div>
+      <div className="tablewrap" style={{ maxHeight: 640, overflow: "auto" }}>
+        <table>
+          <thead><tr><th>Day it became waste</th><th>Ingredient</th><th>What happened</th><th className="n">Quantity</th><th className="n">Value</th></tr></thead>
+          <tbody>
+            {W.length ? W.slice(0, 300).map((x, k) => {
+              const i = BYID[x[1]];
+              return (
+                <tr key={k} onClick={() => set({ ing: x[1], sel: x[1] })} style={{ cursor: "pointer" }}>
+                  <td>{dtxt(x[0])}{dateOf(x[0]).getUTCFullYear() !== dateOf(LAST).getUTCFullYear() ? " " + dateOf(x[0]).getUTCFullYear() : ""}</td>
+                  <td>{i.name}</td>
+                  <td>{reasonName(x)}</td>
+                  <td className="n">{qty(x[3], i.uom)}</td>
+                  <td className="n">{peso(x[2])}</td>
+                </tr>
+              );
+            }) : <tr><td colSpan={5} className="empty">No waste of this type recorded in this period.</td></tr>}
+          </tbody>
+        </table>
+      </div>
+      {W.length > 300 && <div className="t-flat" style={{ padding: "8px 12px" }}>Showing the latest 300 of {num(W.length)} records; narrow the period to see the rest.</div>}
+    </div>
+  );
+}
+
 export function WastePage({ F }) {
   const { S, set } = useApp();
+  const tab = tabOf("waste", S);
   const w = win(S), set_ = new Set(F.map((i) => i.id)), ids = [...set_];
   const W = wasteIn(set_, w.a, w.b), bk = wasteBuckets(w.a, w.b);
   const byIng = {};
@@ -97,7 +147,8 @@ export function WastePage({ F }) {
       <div className="pb-head">
         <WasteKpis F={F} />
       </div>
-      <div className="grid canvas" style={{ gridTemplateRows: "minmax(0, 1fr) minmax(0, 1fr)" }}>
+      {tab === "when" && <div className="grid canvas" style={{ gridTemplateRows: "minmax(0, 1fr)" }}><WasteWhen F={F} /></div>}
+      {tab === "where" && <div className="grid canvas" style={{ gridTemplateRows: "minmax(0, 1fr) minmax(0, 1fr)" }}>
         <div className="panel c7">
           <div className="ph"><h2>Where most of the waste comes from</h2><Info t="Waste by ingredient, largest first." /></div>
           {ingTot.length ? <StackH items={topW.map(([name, , id]) => [name, id])} series={stackW} fmt={(v) => peso(v)} axis={(v) => "₱" + num(v)} label="Waste by ingredient and type" labelWidth={150} onRow={(id) => set({ ing: +id, sel: +id })} /> : <div className="empty">No waste recorded in this period.</div>}
@@ -119,7 +170,7 @@ export function WastePage({ F }) {
               onRow={(id) => set({ ing: +id, sel: +id })} />
           ) : <div className="empty">No waste recorded in this period.</div>}
         </div>
-      </div>
+      </div>}
     </>
   );
 }

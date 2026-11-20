@@ -1,6 +1,6 @@
 // The message to send each supplier for a week's orders (or the shopping list for the walk-in grocery), ready to copy and paste.
 import { D, BYID, nextDelivery, dtxt, isWalkin } from "./model.js";
-import { qty, sum } from "./format.js";
+import { qty, sum, packQty } from "./format.js";
 
 export function supplierMessages(F, week = 1) {
   const ids = new Set(F.map((i) => i.id)), groups = {};
@@ -14,10 +14,10 @@ export function supplierMessages(F, week = 1) {
     let text = "";
     if (buy.length) {
       text = walk
-        ? `Grocery list - ${g.sup.supname}${nxt === null ? "" : " (buy on " + dtxt(nxt) + ")"}\n` + buy.map((r) => `[ ] ${r.i.name}: ${r.p.packs} x ${qty(r.i.pack, r.i.uom)} (${qty(r.p.qty, r.i.uom)} in total)`).join("\n")
+        ? `Grocery list - ${g.sup.supname}${nxt === null ? "" : " (buy on " + dtxt(nxt) + ")"}\n` + buy.map((r) => `[ ] ${r.i.name}: ${r.p.packs} x ${packQty(r.i.pack, r.i.uom)} (${qty(r.p.qty, r.i.uom)} in total)`).join("\n")
           + fresh.map((r) => `\n[ ] ${r.i.name}: about ${qty(r.p.qty, r.i.uom)} for the week (buy fresh each day)`).join("")
         : `Hello ${g.sup.supname}, this is Makisushi. We would like to order for delivery ${nxt === null ? "as soon as possible" : "on " + dtxt(nxt)}:\n`
-          + buy.map((r) => `- ${r.p.packs} x ${qty(r.i.pack, r.i.uom)} ${r.i.name}`).join("\n") + "\nThank you!";
+          + buy.map((r) => `- ${r.p.packs} x ${packQty(r.i.pack, r.i.uom)} ${r.i.name}`).join("\n") + "\nThank you!";
     }
     return { sup: g.sup.sup, name: g.sup.supname, walk, text, total: sum(g.rows.map((r) => r.p.cost)) };
   }).filter((m) => m.text).sort((a, b) => b.total - a.total);

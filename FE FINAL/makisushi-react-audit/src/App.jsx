@@ -41,7 +41,7 @@ const initialState = () => ({
   showHelp: false, allrows: false, invAll: false, heat: "all", ptab: "forecast", lr: 12, planRun: null,
   wi: 1, week: 0, grain: "", range: 90, cat: "", ing: 0, sup: 0,
   store: "", scen: "Base", sel: 0,
-  stab: "overview", ttab: "w1", itab: "status", wtab: "now", btab: "orders",
+  stab: "overview", ttab: "w1", itab: "status", wtab: "where", btab: "orders",
   page: initialPage(),
 });
 
@@ -155,7 +155,7 @@ export default function App() {
     <AppCtx.Provider value={ctx}>
       <div className="pbi-app">
         <header className="pbi-top top">
-          <a className="logo" href="#today" aria-label="Makisushi Japanese Restaurant"><img src="/logo.png" alt="Makisushi Japanese Restaurant" /></a>
+          <a className="logo" href="#today" onClick={(e) => { e.preventDefault(); goto("today"); }} aria-label="Makisushi Japanese Restaurant"><img src="/logo.png" alt="Makisushi Japanese Restaurant" /></a>
           <div className="topr">
             <span className={`pill${stale ? " stale" : ""}`} title={stale ? "The data has not been updated for more than 2 days. Send the latest daily upload." : undefined}>
               <span className="dot" /><span id="datapill">{dataPill}</span>

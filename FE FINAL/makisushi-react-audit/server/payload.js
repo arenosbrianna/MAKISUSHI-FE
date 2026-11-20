@@ -247,7 +247,7 @@ export async function buildDashboardPayload() {
       budget: budgetBase, plan, deliveries, budget_check };
   }
   const planRuns = optRuns.map(buildRun).sort((x, y) => x.level - y.level);
-  // The other two owner priorities (Minimize spoilage, Maximize availability) are plans of the v18.5 model outputs, not rows of the warehouse
+  // The other two owner priorities (Minimize waste, Maximize availability) are plans of the v18.5 model outputs, not rows of the warehouse
   // (Balanced is the warehouse's 80% run). They are read from server/data/priority_plans.json, copied from model_rerun_v18_5/outputs.
   const prioFile = readJson("priority_plans.json"), prioRuns = [];
   for (const key of ["min_spoilage", "max_availability"]) {

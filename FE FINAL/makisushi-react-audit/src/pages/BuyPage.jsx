@@ -2,7 +2,7 @@
 // and the suppliers and prices behind it.
 import { useState } from "react";
 import { D, M, LAST, BYID, fiso, fd, dtxt, idxOf, series, consumedValue, wk, nextDelivery, isWalkin, levelLabel, levelBacktest } from "../lib/model.js";
-import { peso, kpeso, num, pct, qty, daysTxt, sum } from "../lib/format.js";
+import { peso, kpeso, num, pct, qty, daysTxt, sum, packQty } from "../lib/format.js";
 import { TabBar, BulletBar, Chip, Info, Kpi, Kpis } from "../components/ui.jsx";
 import { ComboChart, Donut } from "../components/Charts.jsx";
 import { ActionsView } from "./Recommendations.jsx";
@@ -45,11 +45,11 @@ export function PriceList({ F, exp }) {
           <small>{g.rows.length} {g.rows.length === 1 ? "item" : "items"}{walk ? "" : " · delivers " + (g.s.interval === 1 ? "every day" : "every " + g.s.interval + " days")}</small></span></div></td></tr>
         {rows.map((i) => {
           const [pu, un] = per(i), pp = i.cost * i.pack;
-          expRows.push([g.s.supname, g.s.contact, i.name, qty(i.pack, i.uom), Math.round(pp * 100) / 100, Math.round(pu * 100) / 100, un, i.minpacks, wait(i)]);
+          expRows.push([g.s.supname, g.s.contact, i.name, packQty(i.pack, i.uom), Math.round(pp * 100) / 100, Math.round(pu * 100) / 100, un, i.minpacks, wait(i)]);
           return (
             <tr key={i.id}>
               <td><b>{i.name}</b><small>{i.store}</small></td>
-              <td>{qty(i.pack, i.uom)}</td>
+              <td>{packQty(i.pack, i.uom)}</td>
               <td className="n"><b>{peso(pp, pp < 100 ? 2 : 0)}</b></td>
               <td className="n">{peso(pu, pu < 100 ? 2 : 0)} <small>per {un}</small></td>
               <td className="n">{i.minpacks} {i.minpacks === 1 ? "pack" : "packs"}</td>
@@ -143,7 +143,7 @@ function FourteenDayPlan({ F, S, set, exp }) {
               <td><b>{i.name}</b><small>{i.store}</small></td>
               <td className="n">{daily ? <span className="chip good">Buy fresh each day</span> : q > 0 ? (l.w[1] ? l.w[1].packs : 0) : "–"}</td>
               <td className="n">{daily ? "" : q > 0 ? (l.w[2] ? l.w[2].packs : 0) : "–"}</td>
-              <td className="n">{q > 0 ? qty(q, i.uom) : <span className="chip flat">No order needed</span>}{q > 0 && !daily ? <small>{qty(i.pack, i.uom)} per pack</small> : null}</td>
+              <td className="n">{q > 0 ? qty(q, i.uom) : <span className="chip flat">No order needed</span>}{q > 0 && !daily ? <small>{packQty(i.pack, i.uom)} per pack</small> : null}</td>
               <td className="n"><b>{q > 0 ? peso(cost(l)) : "–"}</b></td>
             </tr>
           );
@@ -210,10 +210,10 @@ export function OrdersPanel({ F, S, set, exp, msgs }) {
     const walk = isWalkin(g.sup);
     if (msgOrders.length) {
       msgs.current[g.sup.sup] = walk
-        ? `Grocery list - ${g.sup.supname}${nxt === null ? "" : " (buy on " + dtxt(nxt) + ")"}\n` + msgOrders.map((r) => `[ ] ${r.i.name}: ${r.p.packs} x ${qty(r.i.pack, r.i.uom)} (${qty(r.p.qty, r.i.uom)} in total)`).join("\n")
+        ? `Grocery list - ${g.sup.supname}${nxt === null ? "" : " (buy on " + dtxt(nxt) + ")"}\n` + msgOrders.map((r) => `[ ] ${r.i.name}: ${r.p.packs} x ${packQty(r.i.pack, r.i.uom)} (${qty(r.p.qty, r.i.uom)} in total)`).join("\n")
           + orders.filter((r) => r.p.rule === "daily market buy").map((r) => `\n[ ] ${r.i.name}: about ${qty(r.p.qty, r.i.uom)} for the week (buy fresh each day)`).join("")
         : `Hello ${g.sup.supname}, this is Makisushi. We would like to order for delivery ${nxt === null ? "as soon as possible" : "on " + dtxt(nxt)}:\n`
-          + msgOrders.map((r) => `- ${r.p.packs} x ${qty(r.i.pack, r.i.uom)} ${r.i.name}`).join("\n") + "\nThank you!";
+          + msgOrders.map((r) => `- ${r.p.packs} x ${packQty(r.i.pack, r.i.uom)} ${r.i.name}`).join("\n") + "\nThank you!";
     }
     const when = nxt === null ? "" : ` · ${dtxt(nxt)}`;
     const items = shown.map(({ p, i }) => {
@@ -238,7 +238,7 @@ export function OrdersPanel({ F, S, set, exp, msgs }) {
           <td>
             {!buy ? <span className="chip flat">No order needed</span>
               : daily ? <><b>{qty(p.qty, i.uom)}</b> <span className="chip good">Buy fresh</span> <small>{peso(p.cost)}</small></>
-                : <><b>{p.packs} × {qty(i.pack, i.uom)}</b> <small>{peso(p.cost)}{a ? " · " + a : ""}</small></>}
+                : <><b>{p.packs} × {packQty(i.pack, i.uom)}</b> <small>{peso(p.cost)}{a ? " · " + a : ""}</small></>}
           </td>
           <td className="n">{leadText}</td>
         </tr>
@@ -302,7 +302,7 @@ export function OrdersPanel({ F, S, set, exp, msgs }) {
   );
 }
 
-// The owner picks the priority of the plan: Minimize spoilage (50% service level), Balanced (80%, recommended) or Maximize availability (95%).
+// The owner picks the priority of the plan: Minimize waste (76% service level), Balanced (80%, recommended) or Maximize availability (95%).
 // Each one is a stored plan; choosing one loads its orders, deliveries and budget on every page. The numbers are the study's test-year backtest (Chapter 4, Figure 4.2.3.5.1).
 const PRIO_RUN = (key) => (key === "bal" ? D.defaultRun : key === "min" ? "min_spoilage" : "max_availability");
 function PrioritySwitch({ set }) {
@@ -313,10 +313,10 @@ function PrioritySwitch({ set }) {
       {PRIORITIES.map((p) => {
         const id = PRIO_RUN(p.key), run = (D.planRuns || []).find((r) => r.id === id), on = id === cur;
         return (
-          <button key={p.key} type="button" role="radio" aria-checked={on} data-t={"Before: " + num(H.episodes) + " stockouts, " + peso(H.expiry) + " expiry a year"} className={"prio-opt" + (on ? " on" : "")} disabled={!run} onClick={() => set({ planRun: id })}>
+          <button key={p.key} type="button" role="radio" aria-checked={on} data-t={"Before: " + num(H.episodes) + " stockouts, " + peso(H.expiry) + " waste in a year"} className={"prio-opt" + (on ? " on" : "")} disabled={!run} onClick={() => set({ planRun: id })}>
             <span className="po-h"><b>{p.label}</b>{p.recommended && <Chip cls="good">Recommended</Chip>}{on && <Chip cls="flat">Loaded</Chip>}</span>
             <span className="po-s">{levelLabel(run ? run.level : 0)} service level</span>
-            <span className="po-row"><span className="po-n"><b>{num(p.episodes)}</b> stockouts</span><span className="po-n"><b>{peso(p.expiry)}</b> expiry a year</span><span className="po-n"><b>{run ? kpeso(run.purchase_php) : "–"}</b> 14 days</span></span>
+            <span className="po-row"><span className="po-n"><b>{num(p.episodes)}</b> stockouts</span><span className="po-n"><b>{peso(p.expiry)}</b> waste in a year</span><span className="po-n"><b>{run ? kpeso(run.purchase_php) : "–"}</b> 14 days</span></span>
           </button>
         );
       })}
@@ -347,10 +347,10 @@ function ServiceLevelPanel({ set }) {
     <>
       <div className="panel c5">
         <div className="ph"><h2>What each service level changes</h2>
-          <Info t={"The warehouse stores the 14-day plan at every service level from 80% to 99%; the admin can load any of them. The figures are the study's test-year backtest (" + SL.period + ") against how the restaurant ordered before. Expiry is stock kept past its shelf life."} /></div>
+          <Info t={"The warehouse stores the 14-day plan at every service level from 80% to 99%; the admin can load any of them. The figures are the study's test-year backtest (" + SL.period + ") against how the restaurant ordered before. Waste here is stock kept past its shelf life."} /></div>
         <div className="tablewrap fitc">
           <table>
-            <thead><tr><th>Level</th><th className="n">Stockouts</th><th className="n">Expiry a year</th><th className="n">Net cost</th></tr></thead>
+            <thead><tr><th>Level</th><th className="n">Stockouts</th><th className="n">Waste in a year</th><th className="n">Net cost</th></tr></thead>
             <tbody>
               {shown.map((r) => (
                 <tr key={r.run.id} className={"click" + (r.run.id === cur ? " sel" : "")} onClick={() => set({ planRun: r.run.id })}>
@@ -371,10 +371,10 @@ function ServiceLevelPanel({ set }) {
         <input id="selLevel" className="wi-range" type="range" min={0} max={rows.length - 1} step={1} value={selIdx}
           onChange={(e) => set({ planRun: rows[+e.target.value].run.id })} aria-label="Service level" />
         <div className="wi-ends"><span>{levelLabel(rows[0].run.level)}</span><span>{levelLabel(rows[rows.length - 1].run.level)}</span></div>
-        <div className="wi-verdict"><Chip cls={within ? "good" : "warn"}>{within ? "Expiry below before: inside the study rule" : "Expiry above before: over the study rule"}</Chip></div>
+        <div className="wi-verdict"><Chip cls={within ? "good" : "warn"}>{within ? "Waste below before: inside the study rule" : "Waste above before: over the study rule"}</Chip></div>
         <dl className="facts">
           <dt>Stockouts</dt><dd><b>{num(bt.episodes)}</b> <small>before {num(H.episodes)}</small></dd>
-          <dt>Expiry a year</dt><dd><b>{peso(bt.expiry)}</b> <small>before {peso(H.expiry)}</small></dd>
+          <dt>Waste in a year</dt><dd><b>{peso(bt.expiry)}</b> <small>before {peso(H.expiry)}</small></dd>
           <dt>Demand met</dt><dd><b>{pct(bt.fill, 1)}</b> <small>before {pct(H.fill, 1)}</small></dd>
           <dt>Next 14 days</dt><dd><b>{peso(D.opt.purchase_php || sum(D.plan.map((p) => p.cost)))}</b> <small>{num(sum(D.plan.map((p) => p.packs)))} packs</small></dd>
         </dl>
@@ -386,8 +386,8 @@ function ServiceLevelPanel({ set }) {
         <div className="legend"><span><i style={{ background: "var(--bad)" }} />Before: {num(H.episodes)} episodes</span></div>
       </div>
       <div className="panel c6">
-        <div className="ph"><h2>Expiry a year</h2><Info t="Stock kept past its shelf life, in pesos a year. Lower is better. Red bars expire more than the restaurant's current way of ordering." /></div>
-        <ComboChart x={x} h={200} yfmt={kpeso} bars={[{ vals: rows.map((r) => r.bt.expiry), colors: rows.map((r, k) => barCol(r.bt.expiry, k, r.bt.expiry > H.expiry)), name: "Expiry a year", fmt: peso }]}
+        <div className="ph"><h2>Waste in a year</h2><Info t="Waste in pesos a year (stock kept past its shelf life, as the backtest simulates it). Lower is better. Red bars waste more than the restaurant's current way of ordering." /></div>
+        <ComboChart x={x} h={200} yfmt={kpeso} bars={[{ vals: rows.map((r) => r.bt.expiry), colors: rows.map((r, k) => barCol(r.bt.expiry, k, r.bt.expiry > H.expiry)), name: "Waste in a year", fmt: peso }]}
           refs={[{ y: H.expiry, label: "", color: "var(--bad)" }]} />
         <div className="legend"><span><i style={{ background: "var(--bad)" }} />Before: {peso(H.expiry)}</span><span><i style={{ background: "#F2B8A2" }} />More than before</span></div>
       </div>

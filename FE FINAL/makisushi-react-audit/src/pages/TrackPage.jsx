@@ -3,7 +3,7 @@
 // dw.fact_recommendation_outcome through the server (the page itself never talks to the database).
 import { useCallback, useEffect, useState } from "react";
 import { D, M, LAST, BYID, idxOf, fiso, dateOf } from "../lib/model.js";
-import { peso, num, pct, qty, sum } from "../lib/format.js";
+import { peso, num, pct, qty, sum, packQty } from "../lib/format.js";
 import { Kpi, Kpis, Chip, Info, TabBar } from "../components/ui.jsx";
 import { Donut, StackCols } from "../components/Charts.jsx";
 import { useApp } from "../AppContext.js";
@@ -146,7 +146,7 @@ export function TrackPage() {
                       return (
                         <tr key={key(l)}>
                           <td><b>{l.i.name}</b><small>{l.i.supname}</small></td>
-                          <td>{l.p.rule === "daily market buy" ? <><b>{qty(l.p.qty, l.i.uom)}</b> <small>buy fresh each day</small></> : <><b>{l.p.packs} × {qty(l.i.pack, l.i.uom)}</b> <small>{qty(l.p.qty, l.i.uom)} · {peso(l.p.cost)}</small></>}</td>
+                          <td>{l.p.rule === "daily market buy" ? <><b>{qty(l.p.qty, l.i.uom)}</b> <small>buy fresh each day</small></> : <><b>{l.p.packs} × {packQty(l.i.pack, l.i.uom)}</b> <small>{qty(l.p.qty, l.i.uom)} · {peso(l.p.cost)}</small></>}</td>
                           <td>
                             <div className="seg">
                               <button aria-pressed={st.implemented === true} onClick={() => edit(l, { implemented: true, qty: st.qty === "" || st.implemented === false ? String(l.p.qty) : st.qty })}>Yes</button>

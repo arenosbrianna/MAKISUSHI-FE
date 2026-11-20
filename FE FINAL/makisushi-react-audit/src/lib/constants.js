@@ -19,6 +19,7 @@ export const PAGES = [
 export const SUBTABS = {
   buy: { key: "btab", def: "plan", list: [["plan", "Plan"], ["prep", "Daily prep"], ["level", "What-if"]] },
   pred: { key: "ptab", def: "forecast", list: [["forecast", "Next 2 weeks"], ["byIng", "By ingredient"], ["year", "Up to 1 year"], ["weather", "Weather and calendar"]] },
+  waste: { key: "wtab", def: "where", list: [["where", "Where it comes from"], ["when", "When it was wasted"]] },
   inv: { key: "itab", def: "status", list: [["status", "Status"], ["risk", "Running out"], ["outs", "Stockouts"]] },
   sales: { key: "stab", def: "overview", list: [["overview", "Sales"], ["products", "Top dishes"], ["time", "Ingredient use"], ["what", "Most used"]] },
   track: { key: "ttab", def: "w1", list: [["w1", "This week"], ["w2", "Next week"], ["hist", "History"]] },
@@ -42,12 +43,12 @@ export const BACKTEST = {
 };
 // The three owner priorities (Chapter 4, Figure 4.2.3.5.1), each at the Base budget of ₱87,000 a month.
 export const PRIORITIES = [
-  { key: "min", label: "Minimize spoilage", setting: "50% service level, waste penalised at 2× cost", episodes: 381, expiry: 5232, problems: 207065,
-    fit: "For an owner whose only concern is waste. Runs out more often than today." },
+  { key: "min", label: "Minimize waste", setting: "76% service level, waste penalised at 0.5× cost", episodes: 214, expiry: 7816, problems: 117614,
+    fit: "For an owner whose main concern is waste: the least waste, and fewer stockouts than today but more than Balanced." },
   { key: "bal", label: "Balanced", setting: "80% service level, waste penalised at 0.5× cost", episodes: 180, expiry: 9077, problems: 105898, recommended: true,
-    fit: "Recommended default: fewer stockouts and less expiry than today." },
+    fit: "Recommended default: fewer stockouts and less waste than today." },
   { key: "max", label: "Maximize availability", setting: "95% service level, waste penalised at 0.25× cost", episodes: 94, expiry: 18250, problems: 62160,
-    fit: "For an owner who values never running out most. Expires more than today." },
+    fit: "For an owner who values never running out most. More waste than today." },
 ];
 
 // period choices; "All data" uses the whole data range

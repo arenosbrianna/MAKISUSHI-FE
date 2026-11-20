@@ -122,7 +122,7 @@ function attentionItems(F) {
 // "Is the plan working?": the recommended Balanced plan against historical ordering on the study's test year (Chapter 4 backtest)
 function PlanWorking() {
   // the backtest of the service level that is loaded (80%, Balanced, unless another level was chosen on Purchasing)
-  const bt = D.opt.bt || levelBacktest(D.opt.service || 0.8), lvl = D.opt.owner === "min_spoilage" ? "Minimize spoilage" : D.opt.owner === "max_availability" ? "Maximize availability" : levelLabel(D.opt.service || 0.8);
+  const bt = D.opt.bt || levelBacktest(D.opt.service || 0.8), lvl = D.opt.owner === "min_spoilage" ? "Minimize waste" : D.opt.owner === "max_availability" ? "Maximize availability" : levelLabel(D.opt.service || 0.8);
   const H = BACKTEST.hist, P = bt ? { episodes: bt.episodes, expiry: bt.expiry, avgStock: bt.avg_stock, fill: bt.fill } : BACKTEST.plan;
   const row = (label, cur, ref, fmt, lowerBetter) => {
     const pc = Math.round(Math.abs(cur / ref - 1) * 100), better = lowerBetter ? cur <= ref : cur >= ref;
@@ -135,14 +135,14 @@ function PlanWorking() {
     <div className="panel c3 fillt">
       <div className="ph">
         <h2>Is the plan working? <small style={{ fontWeight: 500, color: "var(--muted)" }}>service level {lvl}</small></h2>
-        <Info t={"The plan at this service level (80%, Balanced, is the recommended default) replayed day by day over the test year (" + BACKTEST.period + ") against the same demand as historical ordering. It is a backtest from Chapter 4, not live results. Expiry is stock kept past its shelf life, valued at standard cost; spoilage (about " + peso(BACKTEST.spoilage) + " a year) is estimated separately and never added to it. Record what you really ordered on the Tracking page to build live evidence."} />
+        <Info t={"The plan at this service level (80%, Balanced, is the recommended default) replayed day by day over the test year (" + BACKTEST.period + ") against the same demand as historical ordering. It is a backtest from Chapter 4, not live results. Waste here is stock kept past its shelf life, valued at standard cost; spoilage, the other part of waste (about " + peso(BACKTEST.spoilage) + " a year), is estimated separately and never added to it. Record what you really ordered on the Tracking page to build live evidence."} />
       </div>
       <div className="tablewrap fitc">
         <table>
           <thead><tr><th>Backtest</th><th className="n">Before</th><th className="n">Plan</th><th className="n">Change</th></tr></thead>
           <tbody>
             {row("Stockout episodes", P.episodes, H.episodes, num, true)}
-            {row("Expiry a year", P.expiry, H.expiry, peso, true)}
+            {row("Waste in a year", P.expiry, H.expiry, peso, true)}
             {row("Average stock held", P.avgStock, H.avgStock, peso, true)}
             {row("Fill rate", P.fill, H.fill, (v) => pct(v, 1), false)}
           </tbody>
