@@ -139,6 +139,8 @@ Live at https://makisushi-dss.vercel.app (Vercel project `makisushi-dss`, region
   which serves the same Express app as the local server (`server/app.js`). `server/data/` is bundled with the function.
 - Set these environment variables in the Vercel project (Production and Preview): `DATABASE_URL`, `BUDGET_LOW`, `BUDGET_HIGH`,
   `WEATHER_LAT`, `WEATHER_LON`, `DSS_USER`, `DSS_PASSWORD`. A changed variable takes effect after the next deployment.
-- Deploy from this folder with `npx vercel@latest deploy --prod --yes`. `.vercelignore` keeps `.env` out of the upload.
+- The Vercel project is connected to this repository: a push to `FINAL-REACT` builds and deploys production automatically, from the
+  root folder `FE FINAL/makisushi-react-audit`. Pushes to other branches are skipped (Ignored Build Step), so they never build.
+- A manual deploy still works from the repository root: `npx vercel@latest deploy --prod --yes`. `.vercelignore` keeps `.env` out.
 - Sign-in is checked by the server (`server/auth.js`): a correct username and password get a signed, HttpOnly session cookie
   (12 hours); every `/api` route except sign-in and sign-out needs it.
