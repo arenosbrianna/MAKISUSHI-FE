@@ -80,12 +80,14 @@ export default function App() {
     let cancelled = false;
     fetch("/api/dashboard")
       .then(async (r) => {
+        // the server session has ended (12 hours, or the browser was closed): show the sign-in page again
+        if (r.status === 401) { forgetSignIn(); if (!cancelled) setSignedIn(false); return null; }
         const j = await r.json();
         if (!r.ok) throw new Error(j.detail || j.error || r.statusText);
         return j;
       })
       .then((j) => {
-        if (cancelled) return;
+        if (cancelled || !j) return;
         initModel(j);
         setStatus({ loading: false, error: null });
       })

@@ -82,10 +82,9 @@ function InvKpis({ F }) {
     <Kpis>
       <Kpi label="Stock on hand" value={peso(sv)} delta={<span className="t-flat">{daysTxt(doh)} days of use</span>}
         spark={wks.map((x) => stockValue(ids, x.b))}
-        info="Stock on hand today at standard cost. Small line: each of the last 12 weeks." />
+        />
       <Kpi act={{ page: "inv", tab: "risk", hint: "Running out" }} label="Days on hand" value={daysTxt(doh) + " days"}
-        delta={<span className={doh < lowD ? "t-bad" : doh > highD ? "t-warn" : "t-good"}>healthy {daysTxt(lowD)} to {daysTxt(highD)} days</span>}
-        info="Days the stock lasts at the last 4 weeks' use. Healthy: between the order level and the target." />
+        info="Days the stock lasts at the last 4 weeks' use." />
       <Kpi label="Stock turnover" value={tn.toFixed(1) + " times a month"} delta={deltaEl(tn, tnP, (v) => v.toFixed(1), false)}
         info="Times a month the stock is used up. Higher means leaner stock." />
       <Kpi label="Cost of running out" value={peso(cost)} delta={<>{`${num(so)} stock-outs · `}{deltaEl(cost, costP, (v) => peso(v), true)}</>}

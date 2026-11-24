@@ -1,4 +1,4 @@
-// Sign-in page, taken from the React branch of MAKISUSHI-FE. The check itself lives in auth.js.
+// Sign-in page, taken from the React branch of MAKISUSHI-FE. The server checks the sign-in (auth.js, server/auth.js).
 import { useEffect, useState } from "react";
 import { LoginArt } from "./LoginArt.jsx";
 import { checkLogin } from "./auth.js";
@@ -20,10 +20,14 @@ export function LoginPage({ onSignIn }) {
     return () => { document.title = before; };
   }, []);
 
-  const submit = (e) => {
+  const [busy, setBusy] = useState(false);
+  const submit = async (e) => {
     e.preventDefault();
-    if (!checkLogin(username, password)) {
-      setError("Incorrect username or password.");
+    setBusy(true);
+    const r = await checkLogin(username, password);
+    setBusy(false);
+    if (!r.ok) {
+      setError(r.error);
       setPassword("");
       return;
     }
@@ -67,7 +71,7 @@ export function LoginPage({ onSignIn }) {
               </span>
             </label>
 
-            <button className="login-submit" type="submit" disabled={!username.trim() || !password}>
+            <button className="login-submit" type="submit" disabled={busy || !username.trim() || !password}>
               Sign in <Icon d="M5 12h14M13 6l6 6-6 6" />
             </button>
           </form>

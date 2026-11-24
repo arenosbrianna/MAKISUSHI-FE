@@ -173,12 +173,12 @@ export function SalesPage({ F }) {
     <>
       <div className="pb-head">
         <Kpis>
-          <Kpi label="Net sales" value={peso(net)} delta={hasPrev ? deltaEl(net, netP, (x) => peso(x), false) : ""} info="Sales after discounts in the selected period." onGo={goto} />
+          <Kpi label="Net sales" value={peso(net)} delta={hasPrev ? deltaEl(net, netP, (x) => peso(x), false) : ""} onGo={goto} />
           <Kpi label="Order lines" value={num(lines)} delta={hasPrev ? deltaEl(lines, linesP, num, false) : ""}
             info="One line per dish on a receipt. The sales export has no receipt number, so lines are counted." onGo={goto} />
           <Kpi label="Average per order line" value={peso(lines ? net / lines : 0, 0)} delta={hasPrev && linesP ? deltaEl(net / (lines || 1), netP / linesP, (x) => peso(x, 0), false) : ""}
             info="Net sales per order line, not per receipt." onGo={goto} />
-          <Kpi label="Items sold" value={num(qn)} delta={hasPrev ? deltaEl(qn, qnP, num, false) : ""} info="Total quantity of menu items sold." onGo={goto} />
+          <Kpi label="Items sold" value={num(qn)} delta={hasPrev ? deltaEl(qn, qnP, num, false) : ""} onGo={goto} />
           <Kpi label="Year-over-year growth" value={yoy === null ? "–" : (yoy >= 0 ? "+" : "−") + Math.abs(yoy * 100).toFixed(1) + "%"}
             delta={<span className="t-flat">{yoy === null ? "no earlier year in the data" : yLab(curW.a, curW.b) + " against " + yLab(prevW.a, prevW.b)}</span>}
             info="Against the same days a year earlier." onGo={goto} />
@@ -194,7 +194,7 @@ export function SalesPage({ F }) {
               <div className="legend">{trendLines.filter((l) => l.color !== "#94A3B8").map((l) => <span key={l.label}><i style={{ background: l.color }} />{l.label}</span>)}{trendLines.some((l) => l.color === "#94A3B8") && <span><i style={{ background: "#94A3B8" }} />Earlier years ({trendLines.filter((l) => l.color === "#94A3B8").map((l) => l.label).join(", ")})</span>}{trendNote && <span>{trendNote}</span>}</div>
             </div>
             <div className="panel c4">
-              <div className="ph"><h2>Sales by category</h2><Info t="Share of net sales in the period." /></div>
+              <div className="ph"><h2>Sales by category</h2></div>
               {donutTop.length ? <HBars fill items={donutTop.map(([n, v]) => [n, v])} fmt={(v) => kpeso(v) + " · " + (net ? (v / net * 100).toFixed(1) : 0) + "%"} axis={kpeso} labelWidth={120} label="Sales by category" /> : <div className="empty">No sales in this period.</div>}
             </div>
             <div className="panel c7">

@@ -11,6 +11,20 @@ const TICK = { fontSize: 11, fill: "#64748B" };
 // Recharts calls formatters with (value, index); pass only the value, so a formatter such as num() never reads the index as its precision
 const tf = (f) => (v) => f(v);
 
+// Phones only (600 px wide or less): the horizontal bar charts use a narrower label column and just the first and last axis
+// values, so the bars keep room and the axis numbers do not run into each other. Wider screens are unchanged.
+const PHONE_Q = "(max-width: 600px)";
+export function usePhone() {
+  const [p, setP] = useState(() => typeof window !== "undefined" && !!window.matchMedia && window.matchMedia(PHONE_Q).matches);
+  useEffect(() => {
+    if (!window.matchMedia) return undefined;
+    const m = window.matchMedia(PHONE_Q), on = () => setP(m.matches);
+    m.addEventListener ? m.addEventListener("change", on) : m.addListener(on);
+    return () => (m.removeEventListener ? m.removeEventListener("change", on) : m.removeListener(on));
+  }, []);
+  return p;
+}
+
 // Even axis steps on a round number (1, 2 or 5 times a power of ten), so every tick label shows and the gaps match
 export function niceTicks(top, steps = 4) {
   if (!(top > 0)) return { max: 1, ticks: [0, 0.5, 1] };
@@ -187,7 +201,8 @@ function BarMarks({ xAxisMap, yAxisMap, rows, marks, labels }) {
 // Horizontal bars with labels on the left (the original "hbar")
 // notes: optional text per row, shown after the value (for example a growth figure or a class)
 // fill: stretch the rows to the height of the card (never thinner than 13px a row) instead of a fixed 26px a row
-export function HBars({ items, w, marks, axis, fmt, shade, color, click, onRow, label, max, labelWidth = 170, notes, values = true, fill = false }) {
+export function HBars({ items, w, marks, axis, fmt, shade, color, click, onRow, label, max, labelWidth: lw0 = 170, notes, values = true, fill = false }) {
+  const phone = usePhone(), labelWidth = phone ? Math.min(lw0, 92) : lw0;
   const n = items.length;
   const rowH = 26, H = 6 + n * rowH + 30;
   const f = fmt || num;
@@ -199,15 +214,15 @@ export function HBars({ items, w, marks, axis, fmt, shade, color, click, onRow, 
   const metas = { v: { name: label || "", fmt: f } };
   const rowColor = (d) => d.color || (shade === "cat" ? PAL[data.indexOf(d) % PAL.length] : shade ? ramp(d.v / maxRow, shade) : color || "var(--accent)");
   // room on the right for the longest value label (drawn as plain text, so short bars do not wrap it)
-  const rightPad = Math.max(marks ? 56 : 36, values ? Math.round(Math.max(0, ...data.map((d) => d.lab.length)) * 6.2) + 14 : 16);
+  const rightPad = Math.max(marks ? 56 : 36, values ? Math.round(Math.max(0, ...data.map((d) => d.lab.length)) * (phone ? 5.6 : 6.2)) + 14 : 16);
   return (
     <div className={fill ? "cwrap" : "hbars"}>
       <div className="rc" style={{ height: H, minHeight: fill ? 6 + n * 13 + 30 : undefined }}>
         <ResponsiveContainer width="100%" height="100%">
           <BarChart layout="vertical" data={data} margin={{ top: 6, right: rightPad, left: 0, bottom: 24 }} barCategoryGap="30%">
             <XAxis type="number" domain={[0, mx]} tick={TICK} tickLine={false} axisLine={false} tickFormatter={tf(axis || num)}
-              ticks={nt ? nt.ticks : undefined} interval={nt ? 0 : undefined} tickCount={nt ? undefined : 5} />
-            <YAxis type="category" dataKey="name" width={labelWidth} interval={0} tickLine={false} axisLine={false} tick={<WrapTick width={Math.round(labelWidth / (fill ? 6.4 : 7))} fontSize={fill ? 10.5 : 11} />} />
+              ticks={phone ? [0, mx] : nt ? nt.ticks : undefined} interval={nt || phone ? 0 : undefined} tickCount={nt || phone ? undefined : 5} />
+            <YAxis type="category" dataKey="name" width={labelWidth} interval={0} tickLine={false} axisLine={false} tick={<WrapTick width={Math.round(labelWidth / (fill ? 6.4 : 7))} fontSize={fill || phone ? 10.5 : 11} />} />
             <Tooltip content={<TipBox metas={metas} />} cursor={{ fill: "transparent" }} isAnimationActive={false} />
             <Bar dataKey="v" isAnimationActive={false} radius={[2, 2, 2, 2]} cursor={click ? "pointer" : undefined}
               onClick={(e) => click && onRow && e && e.payload && onRow(e.payload.id)}>
@@ -227,7 +242,8 @@ export function HBars({ items, w, marks, axis, fmt, shade, color, click, onRow, 
 }
 
 // Stacked horizontal bars, one row per item (a ranking split into parts): items [name, id], series [{name, color, vals}]
-export function StackH({ items, series, fmt, axis, label, labelWidth = 150, onRow }) {
+export function StackH({ items, series, fmt, axis, label, labelWidth: lw0 = 150, onRow }) {
+  const phone = usePhone(), labelWidth = phone ? Math.min(lw0, 92) : lw0;
   const n = items.length, f = fmt || num;
   const data = items.map((it, i) => {
     const row = { name: it[0], id: it[1] };
@@ -244,7 +260,7 @@ export function StackH({ items, series, fmt, axis, label, labelWidth = 150, onRo
       <div className="rc" style={{ height: 6 + n * 26 + 30, minHeight: 6 + n * 13 + 30 }} aria-label={label}>
         <ResponsiveContainer width="100%" height="100%">
           <BarChart layout="vertical" data={data} margin={{ top: 6, right: 64, left: 0, bottom: 24 }} barCategoryGap="30%">
-            <XAxis type="number" domain={[0, nt.max]} ticks={nt.ticks} interval={0} tick={TICK} tickLine={false} axisLine={false} tickFormatter={tf(axis || num)} />
+            <XAxis type="number" domain={[0, nt.max]} ticks={phone ? [0, nt.max] : nt.ticks} interval={0} tick={TICK} tickLine={false} axisLine={false} tickFormatter={tf(axis || num)} />
             <YAxis type="category" dataKey="name" width={labelWidth} interval={0} tickLine={false} axisLine={false} tick={<WrapTick width={Math.round(labelWidth / 6.4)} fontSize={10.5} />} />
             <Tooltip content={<TipBox metas={metas} />} cursor={{ fill: "transparent" }} isAnimationActive={false} />
             {series.map((s, j) => (

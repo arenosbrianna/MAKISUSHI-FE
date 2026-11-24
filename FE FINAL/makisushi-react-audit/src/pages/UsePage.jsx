@@ -76,9 +76,8 @@ export function UsePage({ F, tab }) {
     <>
       <div className="pb-head">
         <Kpis>
-          <Kpi label="Used in period" value={f(used)} delta={deltaEl(used, usedP, (q) => f(q), false)}
-            info="Ingredient use in the period, at standard cost." />
-          <Kpi label="Last 7 days" value={f(last7)} delta={deltaEl(last7, prev7, (q) => f(q), false)} info="Use in the most recent 7 days, against the 7 days before." />
+          <Kpi label="Used in period" value={f(used)} delta={deltaEl(used, usedP, (q) => f(q), false)} />
+          <Kpi label="Last 7 days" value={f(last7)} delta={deltaEl(last7, prev7, (q) => f(q), false)} />
           <Kpi label="Staff meals" value={f(staff)} icon="user" delta={<>{pct(staffShare, 1)} of use{staffP !== null ? " · " : ""}{staffP !== null ? deltaEl(staff, staffP, (q) => f(q), true) : null}</>}
             info="Staff meals and other off-menu use. It is part of what must be ordered." />
           <Kpi label="Busiest day" value={WD[wdAvg.indexOf(wdMax)]} icon="calendar" delta={<span className="t-flat">{f(wdMax)} a day against {f(wdMin)} on {WD[wdAvg.indexOf(wdMin)]}</span>}

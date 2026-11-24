@@ -872,3 +872,26 @@ td.sig small { display: block; margin-top: 2px; text-align: center; }
 .insights, .canvas .recbox ul { justify-content: flex-start; }
 .insights > li:first-child, .canvas .recbox ul > li:first-child { margin-top: auto; }
 .insights > li:last-child, .canvas .recbox ul > li:last-child { margin-bottom: auto; }
+
+/* ---- phones only (600 px wide or less): every card takes the full width and the height of its content, lists are not
+   squeezed or stretched, wide tables scroll sideways inside their card, and side-by-side boxes stack. Wider screens are unchanged. ---- */
+@media (max-width: 600px) {
+  .canvas { grid-template-columns: minmax(0, 1fr) !important; grid-template-rows: none !important; grid-auto-rows: auto !important; gap: 10px; }
+  .canvas > .panel, .canvas > .grid > .panel, .canvas .stack, .canvas .stackcol { grid-column: 1 / -1 !important; grid-row: auto !important; height: auto !important; max-height: none !important; min-height: 0 !important; }
+  .canvas > .panel > .cwrap, .canvas > .panel > .hbars { flex: none !important; }
+  .insights, .canvas .recbox ul, .attn, .scrollbox { flex: none !important; max-height: none !important; overflow: visible !important; }
+  .insights > li, .canvas .recbox li { flex: none !important; max-height: none !important; }
+  .pbi-page table { display: block; max-width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  .tablewrap { max-height: none !important; }
+  .prio-switch, .prio, .modelcard, .matrix { grid-template-columns: minmax(0, 1fr) !important; }
+  .pbi-page .pb-head .kpi .v { font-size: 21px !important; white-space: normal; overflow-wrap: anywhere; }
+  .pbi-page .pb-head .kpi .v .vb { font-size: 12px !important; }
+  .pb-head .kpi .l { white-space: normal; }
+  .pb-head .kpi .kbody { overflow: visible; }
+  .canvas > .panel > .donut.auto { flex: none !important; overflow: visible !important; flex-wrap: wrap !important; justify-content: center; }
+  .canvas > .panel > .donut.auto ul { min-width: 0; flex: 1 1 160px; }
+  .pbi-page label { max-width: 100%; }
+  .pbi-page select { width: 100%; min-width: 0; }
+  .pbi-page select, .pbi-page input:not([type="checkbox"]):not([type="radio"]) { max-width: 100%; }
+  .rep-actions { flex-wrap: wrap; }
+}

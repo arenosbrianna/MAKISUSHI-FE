@@ -69,16 +69,16 @@ export function OpsKpis({ F }) {
     <Kpis>
       <Kpi act={{ page: "inv", tab: "outs", hint: "Stockouts" }} label="Ran out" value={num(so)} delta={deltaEl(so, soP, num, true)}
         spark={tr((a, b) => soIn(set_, a, b).length)} sparkColor="var(--bad)"
-        info="Times an ingredient ran out in the period. Small line: each of the last 12 weeks." />
+        />
       <Kpi act={{ page: "inv", tab: "outs", patch: { soView: "lost" }, hint: "Lost sales" }} label="Demand served" value={pct(fill, 2)} delta={<span className="t-flat">{num(split.em)} emergency · {num(split.lost)} lost</span>}
         spark={tr((a, b) => { const s = consumedValue(ids, a, b), l = unmetValue(ids, a, b); return s + l > 0 ? s / (s + l) : 1; })}
         info="Share of ingredient demand served from stock. Emergency buys count as served." />
       <Kpi act={{ page: "waste", tab: "where", hint: "Waste" }} label="Waste" value={peso(wv)} delta={<>{`${pct(pu ? wv / pu : 0)} of purchases · `}{deltaEl(wv, wvP, (v) => peso(v), true)}</>} goto="waste" onGo={goto}
         spark={tr((a, b) => sum(wasteIn(set_, a, b).map((x) => x[2])))} sparkColor="var(--warn)"
-        info="Waste in pesos and as a share of what was bought. Small line: waste per week." />
+        />
       <Kpi act={{ page: "sales", tab: "time", hint: "Ingredient use" }} label="Ingredient cost" value={pct(fcost)} delta={<>{"of sales · "}{deltaEl(fcost, fcostP, (v) => (v * 100).toFixed(1), true, " pts")}</>} goto="buy" onGo={goto}
         spark={tr((a, b) => { const s = salesIn(a, b); return s ? purchaseValue(ids, a, b) / s : 0; })}
-        info="Spend on perishable ingredients as a share of sales. ▲ means they took a bigger share of each peso sold." />
+        info="Spend on perishable ingredients as a share of sales." />
       <Kpi act={{ page: "buy", tab: "plan", hint: "Budget" }} label="Weekly spend" value={peso(sp)} delta={<>{`${pct(sp / bud, 0)} of ${peso(bud)} budget · `}{deltaEl(sp, spP, (v) => peso(v), true)}</>} goto="buy" onGo={goto}
         spark={tr((a, b) => purchaseValue(ids, a, b))}
         info={"Average spend per week, against the weekly budget of " + peso(bud) + "."} />
@@ -248,7 +248,7 @@ export function TodayPage({ F }) {
         </div>
         <OrdersThisWeek F={F} />
         <div className="panel c6">
-          <div className="ph"><h2>Spend per {unit}</h2>{long && <AggSeg S={S} set={set} />}<Info t="What was bought in the period chosen above, at standard cost." /></div>
+          <div className="ph"><h2>Spend per {unit}</h2>{long && <AggSeg S={S} set={set} />}</div>
           <ComboChart x={wx} h={200} yfmt={kpeso} bars={[{ vals: wBuy, color: "var(--accent)", name: "Bought", fmt: peso }]} refs={unit === "week" ? [{ y: wkBudget, label: "", color: "var(--bad)" }] : unit === "month" ? [{ y: M.budget.Base, label: "", color: "var(--bad)" }] : []} />
           {unit === "week" && <div className="legend"><span><i style={{ background: "var(--bad)" }} />Weekly budget {kpeso(wkBudget)} (each bar is one week)</span>{partNote(wks) && <span>{partNote(wks)}</span>}</div>}
           {unit === "month" && <div className="legend"><span><i style={{ background: "var(--bad)" }} />Monthly budget {kpeso(M.budget.Base)} (each bar is one month)</span>{partNote(wks) && <span>{partNote(wks)}</span>}</div>}

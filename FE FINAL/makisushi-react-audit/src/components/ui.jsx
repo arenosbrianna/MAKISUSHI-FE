@@ -93,7 +93,9 @@ function textOf(node) {
 // A KPI card: the name, the number, a short change badge and an optional trend line. Hover for the comparison with the earlier period.
 export function Kpi({ label, value, delta, goto, onGo, spark, sparkColor, icon, info, act }) {
   const app = useApp();
-  const badge = findCmp(delta), tip0 = badge ? badge.props["data-cmp"] : textOf(delta).trim();
+  // the comparison with the period before is not drawn on the card (no arrow): it is said in words behind the i
+  const badge = findCmp(delta), change = badge ? changeWords(badge) : "";
+  const infoText = [info, change].filter(Boolean).join(" ");
   // act: { page, tab, patch, hint } opens that page (and sub-page), with any filter the card stands for
   const go = act ? () => {
     const p = { ...(act.patch || {}) };
@@ -101,20 +103,29 @@ export function Kpi({ label, value, delta, goto, onGo, spark, sparkColor, icon, 
     if (Object.keys(p).length) app.set(p);
     app.goto(act.page);
   } : goto && onGo ? () => onGo(goto) : null;
-  const tip = [tip0, act ? "Click: " + act.hint : ""].filter(Boolean).join(" · ");
+  const tip = act ? "Click: " + act.hint : "";
   // the words around the badge (what the number is against), shown under the number
   const words = textNoBadge(delta).replace(/^[\s·]+|[\s·]+$/g, "");
   return (
     <button className={"kpi hasico" + (go ? " act" : " noact")} data-t={tip || undefined} aria-label={act ? label + ": " + act.hint : undefined} onClick={() => go && go()}>
       <span className="kico"><Icon name={icon || kpiIcon(label)} size={18} /></span>
       <span className="kbody">
-        <div className="l">{label} <Info t={info} /></div>
-        <div className="v">{value}{badge ? <span className="vb">{badge}</span> : null}</div>
+        <div className="l">{label} <Info t={infoText} /></div>
+        <div className="v">{value}</div>
         {words && words.length <= 34 ? <div className="ks">{words}</div> : null}
       </span>
       {act ? <span className="kgo" aria-hidden="true"><b>{act.hint}</b>›</span> : null}
     </button>
   );
+}
+// "▲ 36% vs before" with "Earlier ₱4,300 → now ₱5,837" becomes "Up 36% on the period before (earlier ₱4,300, now ₱5,837)."
+function changeWords(badge) {
+  const t = textOf(badge).trim(), cmp = String(badge.props["data-cmp"] || "");
+  const m = cmp.match(/^Earlier (.*) → now (.*)$/), pc = / pts vs before$/.test(t) && m && !/%$/.test(m[2]) ? "%" : "";
+  const was = m ? ` (earlier ${m[1]}${pc}, now ${m[2]}${pc})` : "";
+  if (t.startsWith("▬")) return `No change on the period before${was}.`;
+  const amt = t.replace(/^[▲▼]\s*/, "").replace(/\s*vs before$/, "").replace(/ pts$/, " percentage points");
+  return `${t.startsWith("▲") ? "Up" : "Down"} ${amt} on the period before${was}.`;
 }
 function textNoBadge(node) {
   if (node === null || node === undefined || typeof node === "boolean") return "";

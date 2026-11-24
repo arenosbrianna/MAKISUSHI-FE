@@ -130,3 +130,15 @@ a "Recommendations" card with the prescriptive text, and a What-If page with a s
 - Forecast > Up to 1 year has two sliders (From and To) that choose the months the totals, the month table, the ingredient table and the peak and low are read over (for example November to December). The separate Nov to Dec tab was removed.
 - Weather tab: a Year filter (All years by default) for the paydays and weather figures; each card says which dates it is based on.
 - Year over year includes 2021 (marked * when the chosen days are only partly covered, since the records start on 1 September 2021); change chips never compare against a part year and stop at 100%.
+
+## Deploy on Vercel
+
+Live at https://makisushi-dss.vercel.app (Vercel project `makisushi-dss`, region `sin1`, next to the Supabase database).
+
+- `vercel.json` builds the app (`npm run build` → `dist/`) and routes every `/api/*` request to one function, `api/index.js`,
+  which serves the same Express app as the local server (`server/app.js`). `server/data/` is bundled with the function.
+- Set these environment variables in the Vercel project (Production and Preview): `DATABASE_URL`, `BUDGET_LOW`, `BUDGET_HIGH`,
+  `WEATHER_LAT`, `WEATHER_LON`, `DSS_USER`, `DSS_PASSWORD`. A changed variable takes effect after the next deployment.
+- Deploy from this folder with `npx vercel@latest deploy --prod --yes`. `.vercelignore` keeps `.env` out of the upload.
+- Sign-in is checked by the server (`server/auth.js`): a correct username and password get a signed, HttpOnly session cookie
+  (12 hours); every `/api` route except sign-in and sign-out needs it.

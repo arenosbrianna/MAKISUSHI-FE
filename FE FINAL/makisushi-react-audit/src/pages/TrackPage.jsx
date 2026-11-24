@@ -223,7 +223,7 @@ export function TrackPage() {
               {history.length ? <Donut items={[["Followed", sum(history.map((h) => h.yes))], ["Not followed", sum(history.map((h) => h.n - h.yes))]]} colors={["#10B981", "#F59E0B"]} size="auto" center={pct(sum(history.map((h) => h.yes)) / Math.max(1, sum(history.map((h) => h.n))), 0)} sub="followed" label="Recommendations followed" /> : <div className="empty">No decisions recorded yet.</div>}
             </div>
             <div className="panel c8">
-          <div className="ph"><h2>Decision history</h2><Info t="Every saved record, by week of the plan." /></div>
+          <div className="ph"><h2>Decision history</h2></div>
           {history.length ? (
             <div className="tablewrap">
               <table>

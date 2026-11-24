@@ -60,14 +60,13 @@ function WasteKpis({ F }) {
   const top = Object.entries(byIng).sort((a, b) => b[1] - a[1])[0];
   return (
     <Kpis>
-      <Kpi act={{ page: "waste", tab: "when", hint: "By date" }} label="Spoilage · Expiry" value={peso(spo) + " · " + peso(exp)} delta={<span className="t-flat">never added together</span>}
-        info="Spoilage: went bad before expiry. Expiry: kept past its shelf life. Never added together." />
+      <Kpi act={{ page: "waste", tab: "when", hint: "By date" }} label="Spoilage · Expiry" value={peso(spo) + " · " + peso(exp)} info="Spoilage: went bad before expiry. Expiry: kept past its shelf life." />
       <Kpi label="Waste" value={peso(wv)} delta={deltaEl(wv, wvP, (v) => peso(v), true)} spark={wks.map((x) => sum(wasteIn(set_, x.a, x.b).map((z) => z[2])))} sparkColor="var(--warn)"
-        info="Waste in pesos in the period. Small line: each of the last 12 weeks." />
+        />
       <Kpi label="Share of purchases" value={pct(sh, 1)} delta={deltaEl(sh, shP, (v) => (v * 100).toFixed(1), true, " points")}
-        info="Waste as a share of what was bought in the period. Lower is better." />
+        info="Waste as a share of what was bought in the period." />
       <Kpi act={{ page: "waste", tab: "when", patch: top ? { ing: +top[0], sel: +top[0] } : {}, hint: "Its records" }} label="Biggest loss" value={top ? BYID[top[0]].name : "–"} delta={<span className="t-flat">{top ? `${peso(top[1])} · ${pct(wv ? top[1] / wv : 0, 0)} of the waste` : "no waste recorded"}</span>}
-        info="The ingredient that lost the most value in the period." />
+        />
     </Kpis>
   );
 }
@@ -157,7 +156,7 @@ export function WastePage({ F }) {
       {tab === "when" && <div className="grid canvas" style={{ gridTemplateRows: "minmax(0, 1fr)" }}><WasteWhen F={F} /></div>}
       {tab === "where" && <div className="grid canvas" style={{ gridTemplateRows: "minmax(0, 1fr) minmax(0, 1fr)" }}>
         <div className="panel c7">
-          <div className="ph"><h2>Where most of the waste comes from</h2><Info t="Waste by ingredient, largest first." /></div>
+          <div className="ph"><h2>Where most of the waste comes from</h2></div>
           {ingTot.length ? <StackH items={topW.map(([name, , id]) => [name, id])} series={stackW} fmt={(v) => peso(v)} axis={(v) => "₱" + num(v)} label="Waste by ingredient and type" labelWidth={150} onRow={(id) => set({ ing: +id, sel: +id })} /> : <div className="empty">No waste recorded in this period.</div>}
         </div>
         <div className="panel c5">
@@ -165,7 +164,7 @@ export function WastePage({ F }) {
           <HBars fill items={buckets.map((b, k) => [b.label, b.v, k, k === 0 ? "var(--bad)" : k === 1 ? "#F59E0B" : "var(--accent)"])} fmt={(v) => peso(v)} axis={(v) => (v >= 1000 ? "₱" + num(v / 1000) + "k" : "₱" + num(v))} label="Stock value by days left" labelWidth={110} />
         </div>
         <div className="panel c7">
-          <div className="ph"><h2>Spoilage and expiry</h2>{longW && <AggSeg S={S} set={set} />}<Info t="Spoilage: went bad before expiry. Expiry: kept past its shelf life. Never added together." /></div>
+          <div className="ph"><h2>Spoilage and expiry</h2>{longW && <AggSeg S={S} set={set} />}<Info t="Spoilage: went bad before expiry. Expiry: kept past its shelf life." /></div>
           {rsnUsed.length ? (
             <StackCols keys={bk.keys} series={rsnUsed.map((r) => ({ ...r, name: r.name + " · " + peso(sum(r.vals)) }))} fmt={(v) => peso(v)} axis={(v) => "₱" + num(v)} label="Waste by reason" w={900} />
           ) : <div className="empty">No waste recorded in this period.</div>}
