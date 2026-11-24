@@ -920,3 +920,8 @@ td.sig small { display: block; margin-top: 2px; text-align: center; }
   .pbi-nav .nav-top > .nav-group:first-child { margin-left: auto; }
   .pbi-nav .nav-top > .nav-group:last-child { margin-right: auto; }
 }
+
+/* phones: room above and below the sub-page tabs (Plan, Daily prep, What-if, ...) so they do not sit on the filters */
+@media (max-width: 760px) {
+  .phone-subnav { padding: 12px 12px 14px; gap: 8px; }
+}
