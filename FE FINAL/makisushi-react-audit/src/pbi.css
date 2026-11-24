@@ -895,3 +895,11 @@ td.sig small { display: block; margin-top: 2px; text-align: center; }
   .pbi-page select, .pbi-page input:not([type="checkbox"]):not([type="radio"]) { max-width: 100%; }
   .rep-actions { flex-wrap: wrap; }
 }
+
+/* KPI cards that open another page: the arrow keeps to its corner and names its page only when the arrow itself is hovered, and the
+   card's "i" stays above it and clickable (a click on the "i" does not open the page) */
+.kpi.act .kbody { padding-right: 22px; }
+.kpi .kbody .l .info { position: relative; z-index: 2; }
+.kpi.act:hover .kgo b, .kpi.act:focus-visible .kgo b { display: none; }
+.kpi.act .kgo:hover b { display: inline; }
+.kpi .kgo { z-index: 1; }

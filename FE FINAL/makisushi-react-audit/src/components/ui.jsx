@@ -107,7 +107,7 @@ export function Kpi({ label, value, delta, goto, onGo, spark, sparkColor, icon, 
   // the words around the badge (what the number is against), shown under the number
   const words = textNoBadge(delta).replace(/^[\s·]+|[\s·]+$/g, "");
   return (
-    <button className={"kpi hasico" + (go ? " act" : " noact")} data-t={tip || undefined} aria-label={act ? label + ": " + act.hint : undefined} onClick={() => go && go()}>
+    <button className={"kpi hasico" + (go ? " act" : " noact")} data-t={tip || undefined} aria-label={act ? label + ": " + act.hint : undefined} onClick={(e) => { if (e.target.closest && e.target.closest(".info")) return; if (go) go(); }}>
       <span className="kico"><Icon name={icon || kpiIcon(label)} size={18} /></span>
       <span className="kbody">
         <div className="l">{label} <Info t={infoText} /></div>

@@ -271,8 +271,17 @@ async function buildFromSnapshot() {
   // The other two owner priorities (Minimize waste, Maximize availability) are plans of the v18.5 model outputs, not rows of the warehouse
   // (Balanced is the warehouse's 80% run). They are read from server/data/priority_plans.json, copied from model_rerun_v18_5/outputs.
   const prioFile = readJson("priority_plans.json"), prioRuns = [];
+  // From the first plan of the weekly retraining job on, the two priorities are warehouse rows of the selected forecast run: use them
+  // (and keep them out of the What-if levels). Until then the file above is used, as before.
+  const dbPrio = { min_spoilage: /owner priority 'Minimi[sz]e waste'/i, max_availability: /owner priority 'Maximi[sz]e availability'/i };
   for (const key of ["min_spoilage", "max_availability"]) {
     const pp = prioFile && prioFile[key];
+    const dbRun = planRuns.find((r) => dbPrio[key].test(r.policy || ""));
+    if (dbRun) {
+      planRuns.splice(planRuns.indexOf(dbRun), 1);
+      prioRuns.push({ ...dbRun, id: key, owner: key, bt: pp ? pp.backtest : null });
+      continue;
+    }
     if (!pp) continue;
     const plan = pp.lines.filter((r) => byId[r.ing]).map((r) => ({ ing: r.ing, week: r.week, rule: r.rule, packs: r.packs, qty: r.qty, cost: r.cost, end: r.end, sup: r.sup, demand: r.demand, waste: r.waste, short: r.short }));
     const deliveries = [];
