@@ -130,6 +130,11 @@ export const fd = (i, y) => {
   const d = dateOf(i);
   return `${d.getUTCDate()} ${MON[d.getUTCMonth()]}${y ? " " + d.getUTCFullYear() : ""}`;
 };
+// the "Data as of" date, the same on every screen: Sep 8, 2026
+export const fdAsOf = (i) => {
+  const d = dateOf(i);
+  return `${MON[d.getUTCMonth()]} ${d.getUTCDate()}, ${d.getUTCFullYear()}`;
+};
 export const fiso = (s) => `${+s.slice(8, 10)} ${MON[+s.slice(5, 7) - 1]}`;
 export const idxOf = (s) => Math.round((Date.UTC(+s.slice(0, 4), +s.slice(5, 7) - 1, +s.slice(8, 10)) - D0) / 864e5);
 export const wdOf = (i) => (dateOf(i).getUTCDay() + 6) % 7;

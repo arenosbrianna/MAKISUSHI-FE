@@ -2,7 +2,7 @@
 // the best sellers and whether the plan is working. The orders and the daily prep list are on Purchasing.
 import {
   D, M, LAST, BYID, D0, win, bucketsFor, partNote, dishUnits, IT, series, consumedValue, unmetValue, stockoutSplit, purchaseValue, wasteIn, soIn, wk, weeksFrom, fiso,
-  runOutDay, emergencyValue, bucketUnit, nextDelivery, isWalkin, dateOf,
+  runOutDay, emergencyValue, bucketUnit, nextDelivery, isWalkin, dateOf, fdAsOf,
 } from "../lib/model.js";
 import { peso, kpeso, num, pct, qty, daysTxt, sum } from "../lib/format.js";
 import { Kpi, Kpis, deltaEl, Chip, Info, Tiles, AggSeg } from "../components/ui.jsx";
@@ -111,9 +111,9 @@ function attentionItems(F) {
   const share = (a, b) => { const p = purchaseValue(ids, a, b); return p ? sum(wasteIn(set_, a, b).map((x) => x[2])) / p : 0; };
   const s7 = share(LAST - 6, LAST), s365 = share(Math.max(0, LAST - 364), LAST);
   if (s365 > 0 && s7 > s365 * 1.5) out.push({ lvl: "warn", what: "Waste", detail: `${pct(s7, 1)} of buys this week · usual ${pct(s365, 1)}`, page: "waste", patch: { wtab: "lost" } });
-  // how old the data is
+  // data not updated for more than 2 days (the date only, no count of days)
   const age = Math.floor((Date.now() - (D0 + LAST * 864e5)) / 864e5);
-  if (age > 2) out.push({ lvl: "warn", what: "Data", detail: `${age} days old`, page: null });
+  if (age > 2) out.push({ lvl: "warn", what: "Data", detail: `Not updated since ${fdAsOf(LAST)}`, page: null });
   const sev = { bad: 0, warn: 1 };
   return out.sort((a, b) => sev[a.lvl] - sev[b.lvl]);
 }

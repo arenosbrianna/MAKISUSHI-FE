@@ -2,7 +2,7 @@
 // Power BI report: a top bar, a row of slicers across the top of the page, and the pages in a navigation sidebar on the left.
 import { Fragment, useEffect, useMemo, useRef, useState, useCallback } from "react";
 import { AppCtx } from "./AppContext.js";
-import { initModel, selectPlan, LAST, D0, fd, filtered, win, MONTHS, D } from "./lib/model.js";
+import { initModel, selectPlan, LAST, D0, fd, fdAsOf, filtered, win, MONTHS, D } from "./lib/model.js";
 import { NAVN, PAGES, NAV_GROUPS, HEADS, SHORT_RANGE, SUBTABS, tabOf } from "./lib/constants.js";
 
 // the period the page's numbers cover, printed beside the page title
@@ -151,7 +151,7 @@ export default function App() {
   // how old the data is: the pill turns amber after 2 days
   const ageDays = Math.floor((Date.now() - (D0 + LAST * 864e5)) / 864e5);
   const stale = ageDays > 2;
-  const dataPill = `Data as of ${fd(LAST, true)}`;
+  const dataPill = `Data as of ${fdAsOf(LAST)}`;
   const UPLOAD_FORM = "https://proficient-mouse.pikapod.net/form/makisushi-upload-7h3k9q";
   const h = HEADS[S.page];
 
@@ -173,10 +173,16 @@ export default function App() {
           <a className="logo" href="#today" onClick={(e) => { e.preventDefault(); goto("today"); }} aria-label="Makisushi Japanese Restaurant"><img src="/logo.png" alt="Makisushi Japanese Restaurant" /></a>
           <div className="topr">
             <span className={`pill${stale ? " stale" : ""}`} title={stale ? "The data has not been updated for more than 2 days. Send the latest daily upload." : undefined}>
-              <span className="dot" /><span id="datapill">{dataPill}{stale ? ` · ${ageDays} days old` : ""}</span>
+              <span className="dot" /><span id="datapill">{dataPill}</span>
             </span>
-            {stale && <a className="btn pri noprint upl" href={UPLOAD_FORM} target="_blank" rel="noreferrer">Upload the latest data</a>}
+            {stale && (
+              <a className="btn pri noprint upl" href={UPLOAD_FORM} target="_blank" rel="noreferrer" aria-label="Upload the latest data">
+                <span className="upl-ico"><Icon name="upload" size={18} /></span><span className="upl-t">Upload the latest data</span>
+              </a>
+            )}
           </div>
+          {/* phones: the side navigation (and its account menu) is a row of icons, so Sign out sits here, at the top right */}
+          <div className="top-acct noprint"><AccountMenu user="Admin" onSignOut={signOut} /></div>
         </header>
 
         <div className="pbi-body">

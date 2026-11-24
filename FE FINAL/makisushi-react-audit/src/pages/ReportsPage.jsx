@@ -1,7 +1,7 @@
 // Reports: ready-made reports for the owner, the kitchen and the suppliers. Pick one on the left to see its numbers, its chart and its table,
 // and download it as a PDF (the chart and the whole table) or as a spreadsheet (CSV). Reports that cover a period follow the Period filter.
 import { useRef } from "react";
-import { D, LAST, BYID, ING, win, fd, fiso, series, wasteIn, purchaseValue, firstArrival, staffPerDay, isWalkin, fcRange } from "../lib/model.js";
+import { D, LAST, BYID, ING, win, fd, fdAsOf, fiso, series, wasteIn, purchaseValue, firstArrival, staffPerDay, isWalkin, fcRange } from "../lib/model.js";
 import { peso, kpeso, num, pct, qty, sum, packQty } from "../lib/format.js";
 import { Info } from "../components/ui.jsx";
 import { Icon } from "../components/Icons.jsx";
@@ -155,7 +155,7 @@ export function ReportsPage({ F }) {
   const chartRef = useRef(null);
   const reports = buildReports(F, S);
   const r = reports.find((x) => x.id === S.report) || reports[0];
-  const asof = fd(LAST, true);
+  const asof = fdAsOf(LAST);
   return (
     <div className="grid canvas" style={{ gridTemplateRows: "auto minmax(0, 1.25fr) minmax(0, 1fr)" }}>
       <div className="panel c3 r3 replist">

@@ -27,6 +27,7 @@ const PATHS = {
   bag: "M5 8h14l-1 12H6z M9 8V6a3 3 0 0 1 6 0v2",
   fire: "M12 3c1 3 4 4.5 4 9a4 4 0 0 1-8 0c0-2 1-3 2-4 0 2 1 3 2 3 0-3-1-5 0-8z",
   box: "M3 7.5l9-4.5 9 4.5v9l-9 4.5-9-4.5z M3 7.5l9 4.5 9-4.5 M12 12v9",
+  upload: "M12 15V4 M7.5 8.5L12 4l4.5 4.5 M4 15v4.5h16V15",
 };
 
 export function Icon({ name, size = 20 }) {
