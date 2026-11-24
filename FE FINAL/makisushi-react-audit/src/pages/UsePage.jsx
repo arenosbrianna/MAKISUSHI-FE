@@ -1,5 +1,5 @@
 // Ingredient use (shown inside the "Sales & ingredient use" view): use over time, the busy weekdays and months,
-// and which few ingredients carry most of the value (ABC / Pareto).
+// and which few ingredients carry most of the value.
 import { N, LAST, WD, MONTHS, fd, dateOf, series, win, wdOf, consumedValue, BYID, abcOf } from "../lib/model.js";
 import { peso, kpeso, num, pct, qty, sum } from "../lib/format.js";
 import { ComboChart, HBars, DivCols, Donut } from "../components/Charts.jsx";
@@ -44,13 +44,14 @@ export function UsePage({ F, tab }) {
   const avgM = ms.map((vv, m) => (mc[m] ? vv / mc[m] : null)), okM = avgM.filter((v) => v !== null), meanM = okM.length ? sum(okM) / okM.length : 1;
   const monthItems = MONTHS.map((nm, k) => [nm, avgM[k] === null || !meanM ? null : avgM[k] / meanM - 1]);
 
-  // what was used most, with the ABC class of each ingredient
+  // what was used most, and the few ingredients that together make up 80% of the value used (darker bars)
   const usedAll = F.map((i) => [i.name, consumedValue([i.id], w.a, w.b), i.id]).sort((a, b) => b[1] - a[1]);
-  const cls = abcOf(usedAll.map((r) => r[1]));
-  const ABC_COL = { A: "var(--accent)", B: "#93A4D6", C: "#CBD5E1" };
-  const byIng = usedAll.slice(0, 10).map((r, k) => [r[0], r[1], r[2], ABC_COL[cls[k]]]);
-  const nA = cls.filter((c) => c === "A").length;
   const totalUsed = sum(usedAll.map((r) => r[1])) || 1;
+  const inTop = abcOf(usedAll.map((r) => r[1])).map((c) => c === "A");
+  const nA = inTop.filter(Boolean).length;
+  const byIng = usedAll.slice(0, 10).map((r, k) => [r[0], r[1], r[2], inTop[k] ? "var(--accent)" : "#93A4D6"]);
+  // the share of use of the five largest, and the rest together
+  const shareItems = [...usedAll.slice(0, 5).map((r) => [r[0].replace(/ \(.*\)$/, ""), r[1]]), ["Other", sum(usedAll.slice(5).map((r) => r[1]))]].filter((x) => x[1] > 0);
 
   // staff meals and other use outside the menu (recorded as off-POS use), in the period
   const offIn = (id, a, b) => { let t = 0; for (let i = a; i <= b; i++) t += series(id).off[i] || 0; return t * (single ? 1 : BYID[id].cost); };
@@ -76,11 +77,11 @@ export function UsePage({ F, tab }) {
       <div className="pb-head">
         <Kpis>
           <Kpi label="Used in period" value={f(used)} delta={deltaEl(used, usedP, (q) => f(q), false)}
-            info="Total ingredient use in the selected period, valued at standard cost when several ingredients are shown." />
+            info="Ingredient use in the period, at standard cost." />
           <Kpi label="Last 7 days" value={f(last7)} delta={deltaEl(last7, prev7, (q) => f(q), false)} info="Use in the most recent 7 days, against the 7 days before." />
           <Kpi label="Staff meals" value={f(staff)} icon="user" delta={<>{pct(staffShare, 1)} of use{staffP !== null ? " · " : ""}{staffP !== null ? deltaEl(staff, staffP, (q) => f(q), true) : null}</>}
-            info="Staff meals and other use outside the menu (recorded as off-menu use) in the period. It is part of what the kitchen uses, so it is part of what must be ordered." />
-          <Kpi label="Busiest day" value={WD[wdAvg.indexOf(wdMax)]} icon="chart" delta={<span className="t-flat">{f(wdMax)} a day against {f(wdMin)} on {WD[wdAvg.indexOf(wdMin)]}</span>}
+            info="Staff meals and other off-menu use. It is part of what must be ordered." />
+          <Kpi label="Busiest day" value={WD[wdAvg.indexOf(wdMax)]} icon="calendar" delta={<span className="t-flat">{f(wdMax)} a day against {f(wdMin)} on {WD[wdAvg.indexOf(wdMin)]}</span>}
             info="The weekday with the most use. Have stock ready the day before." />
         </Kpis>
       </div>
@@ -97,7 +98,7 @@ export function UsePage({ F, tab }) {
               <Legend items={daily ? [["Per day", "#93A4D6"], ["7-day average", "#D97706"]] : [["Average per day, by week", "var(--accent)"]]} />
             </div>
             <div className="panel c4">
-              <div className="ph"><h2>Dishes and staff meals</h2><Info t="Share of the use in the period that went to dishes sold and to staff meals and other use outside the menu." /></div>
+              <div className="ph"><h2>Dishes and staff meals</h2><Info t="Share of use that went to dishes sold and to off-menu use." /></div>
               <Donut items={[["Dishes sold", Math.max(0, used - staff)], ["Staff meals", staff]]} colors={["var(--accent)", "#F59E0B"]} size="auto" center={f(used)} sub="used" label="Dishes and staff meals" />
             </div>
             <div className="panel c4">
@@ -112,7 +113,7 @@ export function UsePage({ F, tab }) {
               {okM.length > 1 ? <DivCols items={monthItems} label="Busy and quiet months" up="Busier than the average month" down="Quieter than the average month" /> : <div className="empty">Choose a longer period (at least two months) to compare months.</div>}
             </div>
             <div className="panel c4">
-              <div className="ph"><h2>Staff meals by ingredient</h2><Info t="Use outside the menu in the period, by ingredient, with its share of that ingredient's own use. Ground beef and tuna are mostly used outside the menu, so their forecast is of recorded use, which already includes staff meals." /></div>
+              <div className="ph"><h2>Staff meals by ingredient</h2><Info t="Off-menu use by ingredient, and its share of that ingredient's use." /></div>
               {staffTop.length ? <HBars fill items={staffTop} fmt={(q) => f(q)} axis={(q) => (single ? num(q) : kpeso(q))} click label="Staff meals by ingredient" labelWidth={140} color="#F59E0B"
                 notes={staffRows.slice(0, 8).map((r) => pct(r.share, 0) + " of its use")} onRow={(id) => set({ ing: +id, sel: +id })} /> : <div className="empty">No use outside the menu recorded in this period.</div>}
             </div>
@@ -123,13 +124,12 @@ export function UsePage({ F, tab }) {
             <div className="panel c8 r2">
               <div className="ph"><h2>What was used most (₱, selected period)</h2></div>
               <HBars fill items={byIng} fmt={(q) => peso(q)} axis={(q) => "₱" + num(q)} click label="Most used ingredients" labelWidth={140}
-                notes={byIng.map((_, k) => "class " + cls[k])} onRow={(id) => set({ ing: +id, sel: +id })} />
-              <Legend items={[["A: first 80% of use", ABC_COL.A], ["B: next 15%", ABC_COL.B], ["C: the rest", ABC_COL.C]]} />
+                notes={byIng.map((r) => pct(r[1] / totalUsed, 0) + " of use")} onRow={(id) => set({ ing: +id, sel: +id })} />
+              {usedAll.length > 1 && <Legend items={[[nA + (nA === 1 ? " ingredient makes" : " ingredients make") + " up 80% of use: count and order these first", "var(--accent)"], ["The rest", "#93A4D6"]]} />}
             </div>
             <div className="panel c4 r2">
-              <div className="ph"><h2>Use by class</h2><Info t={nA + (nA === 1 ? " ingredient makes" : " ingredients make") + " up 80% of the use. Count and order the A items most carefully."} /></div>
-              <Donut items={["A", "B", "C"].map((c) => [c === "A" ? "A: first 80%" : c === "B" ? "B: next 15%" : "C: the rest", sum(usedAll.filter((_, k) => cls[k] === c).map((r) => r[1]))]).filter((x) => x[1] > 0)}
-                colors={[ABC_COL.A, ABC_COL.B, ABC_COL.C]} size="auto" center={peso(totalUsed)} sub="used" label="Use by class" />
+              <div className="ph"><h2>Share of use</h2></div>
+              <Donut items={shareItems} colors={shareItems.map((x, k) => (x[0] === "Other" ? "#CBD5E1" : ["#1E3A8A", "#3B82F6", "#0EA5E9", "#14B8A6", "#A78BFA"][k]))} size="auto" center={peso(totalUsed)} sub="used" label="Share of use" />
             </div>
           </>
         )}

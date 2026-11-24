@@ -736,11 +736,11 @@ tr.click:hover td { background: #F8FAFC; }
 /* key insights and recommendations: short one-line items with a colour dot */
 .insights { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; justify-content: center; gap: 8px; flex: 1 1 0; min-height: 0; overflow-y: auto; }
 .insights li { display: flex; align-items: center; gap: 10px; padding: 9px 12px; border-radius: 8px; background: var(--soft); border: 1px solid #EEF0F4; font-size: 13.5px; font-weight: 600; flex: 1 1 0; }
-.insights li i { flex: none; width: 10px; height: 10px; border-radius: 50%; background: #94A3B8; }
-.insights li.good i { background: var(--good); }
-.insights li.bad i { background: var(--bad); }
-.insights li.warn i { background: #F59E0B; }
-.insights li.flat i { background: var(--accent); }
+.insights li i { flex: none; width: 22px; height: 22px; display: inline-flex; align-items: center; justify-content: center; font-style: normal; font-weight: 800; font-size: 14px; line-height: 1; border-radius: 50%; border: 1.5px solid currentColor; color: #475569; background: #fff; }
+.insights li.good i { color: #047857; }
+.insights li.bad i { color: #B91C1C; }
+.insights li.warn i { color: #B45309; border: none; font-size: 18px; }
+.insights li.flat i { color: var(--accent); }
 .wi-verdict { margin: 4px 0 2px; }
 
 /* KPI cards at the standard Power BI card size: a large number, the name above it, room around it */
@@ -797,3 +797,78 @@ tr.click:hover td { background: #F8FAFC; }
 .rangepick label { display: flex; flex-direction: column; gap: 2px; font-size: 11.5px; color: var(--muted); }
 .rangepick label b { color: var(--ink); font-size: 13px; }
 .rangepick input[type=range] { width: 150px; max-width: none; accent-color: var(--accent); }
+
+/* audit round: KPI words under the number, page purpose, upload button, wrapping legend names, tappable info */
+.kpi .ks { font-size: 11px; color: #475569; font-weight: 500; margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.kpi .l .info { margin-left: 4px; vertical-align: 1px; }
+.info { cursor: pointer; }
+.pagehead .pagedesc { margin-left: auto; font-size: 12.5px; color: #475569; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 48%; }
+.topr .upl { min-height: 32px; padding: 5px 12px; font-size: 12.5px; margin-left: 10px; text-decoration: none; }
+.donut li .dn { white-space: normal; overflow: visible; text-overflow: clip; line-height: 1.2; }
+.ph .chip { margin-left: 8px; }
+
+/* phones: the navigation is one scrolling row of icons with the current page's sub-pages under it; nothing scrolls sideways */
+@media (max-width: 760px) {
+  .pbi-app { overflow: visible; }
+  .pbi-body, .pbi-main { flex: none; }
+  .pbi-body { height: auto !important; }
+  .pbi-nav { order: -1; }
+  .pbi-main, .pbi-page { height: auto !important; max-height: none !important; overflow: visible !important; }
+  .pbi-app { overflow-x: clip; }
+  .pbi-app, .pbi-body, .pbi-main, .pbi-page { max-width: 100vw; min-width: 0; }
+  .pbi-top { height: auto; min-height: 52px; flex-wrap: wrap; padding: 6px 10px; gap: 6px; }
+  .pbi-top .logo img { height: 28px; width: 140px; }
+  .pbi-top .topr { flex-wrap: wrap; justify-content: flex-end; gap: 6px; }
+  .pbi-top .pill { font-size: 11px; padding: 4px 8px; }
+  .topr .upl { min-height: 28px; padding: 3px 10px; font-size: 11.5px; margin-left: 0; }
+  .pbi-nav { position: static; display: block; width: 100%; padding: 4px 6px; }
+  .pbi-nav .nav-top { display: flex; flex-direction: row; flex-wrap: nowrap; overflow-x: auto; overflow-y: visible; gap: 2px; }
+  .pbi-nav .nav-group { flex-direction: row; gap: 2px; margin: 0; }
+  .pbi-nav .nav-h, .pbi-nav .nav-sep, .pbi-nav .nav-caret, .pbi-nav .nav-acct { display: none; }
+  .pbi-nav .nav-entry { flex-direction: row; }
+  .pbi-nav button.nav-item { padding: 8px 10px; }
+  .pbi-nav .nav-entry:hover .nav-sub, .pbi-nav .nav-entry:focus-within .nav-sub { display: none; }
+  .pbi-nav .nav-entry.cur .nav-sub { display: none; }
+  .pagehead { flex-wrap: wrap; }
+  .pagehead .pagedesc { margin-left: 0; max-width: 100%; white-space: normal; flex-basis: 100%; }
+  .phone-subnav { display: flex !important; }
+}
+.phone-subnav { display: none; gap: 6px; overflow-x: auto; padding: 6px 10px 0; }
+.phone-subnav button { flex: none; font: inherit; font-size: 12.5px; font-weight: 600; padding: 6px 12px; border-radius: 999px; border: 1px solid #CBD5E1; background: #fff; color: var(--accent); }
+.phone-subnav button[aria-current="true"] { background: var(--accent); color: #fff; border-color: var(--accent); }
+@media (max-width: 760px) {
+  .tablewrap { overflow-x: auto !important; max-width: 100%; }
+  .pbi-page .pb-head .kpis { display: grid !important; grid-template-columns: 1fr 1fr !important; gap: 8px; }
+  .pb-head .kpi { padding: 10px; }
+  .pb-head .kpi .kico { display: none; }
+  .pb-head .kpi .v { font-size: 19px; }
+  .pb-head .kpi .vb { display: block; font-size: 11.5px; }
+}
+
+/* long explanations folded into one small "i" line */
+.note-tip { display: flex; align-items: center; gap: 6px; margin-top: 8px; font-size: 11.5px; color: #64748B; }
+.note-tip .info { margin: 0; }
+
+/* KPI cards: the ones with an action look and behave like a link; the others are plain */
+.kpi.noact { cursor: default; }
+.kpi.noact:hover { transform: none; box-shadow: none; }
+.kpi.act { cursor: pointer; position: relative; border-color: #C7D2FE; }
+.kpi.act:hover, .kpi.act:focus-visible { border-color: var(--accent); box-shadow: 0 2px 10px rgba(30, 58, 138, .12); }
+.kpi .kgo { position: absolute; right: 8px; top: 7px; display: inline-flex; align-items: center; gap: 4px; height: 20px; padding: 0 6px; border-radius: 999px; font-size: 11px; font-weight: 700; color: var(--accent); background: var(--accent-soft); white-space: nowrap; }
+.kpi .kgo b { font-weight: 700; display: none; }
+.kpi.act:hover .kgo b, .kpi.act:focus-visible .kgo b { display: inline; }
+
+/* Daily prep: the signal column, one chip of the same size on every row */
+td.sig { white-space: nowrap; width: 1%; }
+td.sig .chip { display: inline-block; min-width: 104px; text-align: center; }
+td.sig small { display: block; margin-top: 2px; text-align: center; }
+.fgrid.one { grid-template-columns: minmax(0, 560px); grid-auto-rows: 300px; justify-content: start; }
+
+/* hover explanations: short paragraphs with room between them */
+.tip { white-space: pre-line; max-width: 340px; padding: 10px 13px; font-size: 12.5px; line-height: 1.5; }
+
+/* Centred lists that can scroll: justify-content:center pushes an overflowing first item above the scroll start, where it
+   cannot be reached. Start at the top and centre with auto margins instead, which give way when the list overflows. */
+.insights, .canvas .recbox ul { justify-content: flex-start; }
+.insights > li:first-child, .canvas .recbox ul > li:first-child { margin-top: auto; }
+.insights > li:last-child, .canvas .recbox ul > li:last-child { margin-bottom: auto; }

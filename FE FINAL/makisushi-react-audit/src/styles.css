@@ -261,3 +261,13 @@ td small + small{margin-top:2px}
 .filters{gap:8px}
 .ydot{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:6px;vertical-align:middle}
 .ftile .rd input[type=checkbox]{accent-color:var(--accent);width:16px;height:16px;margin:0}
+
+.plan-empty{display:flex;flex-direction:column;align-items:flex-start;justify-content:center;gap:8px;text-align:left;height:100%;padding:4px 2px}
+.plan-empty b{color:var(--ink,#0f172a);font-size:14px}.plan-empty span{font-size:13px;line-height:1.45}
+
+/* Busy and slow days: payday and holiday under the weekday columns */
+.daypair { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; flex: none; margin-top: 10px; }
+.daypair .tile { padding: 7px 12px; }
+.daypair .tile b { font-size: 20px; font-variant-numeric: normal; }
+.daypair .tile span { display: flex; align-items: center; gap: 6px; }
+.daypair .tile i { width: 9px; height: 9px; border-radius: 2px; flex: none; }

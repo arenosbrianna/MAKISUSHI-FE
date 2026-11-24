@@ -104,7 +104,7 @@ export function UploadSalesPanel({ up }) {
           <Kpi label="Same as dashboard" value={rc.overlap ? `${rc.match} of ${rc.overlap}` : "–"} delta={<span className="t-flat">days that overlap</span>}
             info="Days that the dashboard already has and that match the file's net sales within 1%." />
           <Kpi label="New days" value={num(rc.fresh)} delta={<span className="t-flat">after {fd(LAST, true)}</span>}
-            info="Days in the file that are newer than the dashboard's sales. They are checked against the forecast on the Forecast page." />
+            info="Days newer than the dashboard's sales, checked against the forecast." />
         </Kpis>
         <div className="grid">
           <div className="panel c8" style={{ boxShadow: "none" }}>

@@ -4,7 +4,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { D, M, LAST, BYID, idxOf, fiso, dateOf } from "../lib/model.js";
 import { peso, num, pct, qty, sum, packQty } from "../lib/format.js";
-import { Kpi, Kpis, Chip, Info, TabBar } from "../components/ui.jsx";
+import { Kpi, Kpis, Chip, Info, TabBar, NoteTip } from "../components/ui.jsx";
 import { Donut, StackCols } from "../components/Charts.jsx";
 import { useApp } from "../AppContext.js";
 import { readDone } from "./BuyPage.jsx";
@@ -59,9 +59,31 @@ export function TrackPage() {
   };
   const edit = (l, patch) => setDraft((d) => ({ ...d, [key(l)]: { ...state(l), ...patch } }));
 
-  const save = async (l) => {
+  // the last save, so that it can be undone: each line with the row it had before (null when it was new)
+  const [undo, setUndo] = useState(null);
+  const remember = (list) => setUndo({ list: list.map((l) => ({ l, prev: saved(l) || null })) });
+  const lineBody = (l, st) => ({ opt_run_id: runId, ingredient_id: l.i.id, week_no: l.p.week });
+  const undoLast = async () => {
+    if (!undo) return;
+    setBusy("undo");
+    const save = undo.list.filter((u) => u.prev).map(({ l, prev }) => ({ ...lineBody(l), implemented: prev.implemented, actual_order_qty: prev.actual_order_qty, actual_waste_qty: prev.actual_waste_qty, actual_stockout_days: prev.actual_stockout_days }));
+    const remove = undo.list.filter((u) => !u.prev).map(({ l }) => lineBody(l));
+    try {
+      const r = await fetch("/api/tracking/batch", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ save, remove }) });
+      const j2 = await r.json();
+      if (!r.ok) throw new Error(j2.detail || j2.error || r.statusText);
+      setUndo(null);
+      toast(`Undone: ${undo.list.length} ${undo.list.length === 1 ? "line" : "lines"} put back as before.`);
+    } catch (e) {
+      toast("Not undone, nothing changed: " + e.message);
+    } finally {
+      setBusy(""); load();
+    }
+  };
+
+  const save = async (l, quiet) => {
     const st = state(l);
-    if (st.implemented === null) { toast("Choose Yes or No first."); return; }
+    if (st.implemented === null) { if (!quiet) toast("Choose Yes or No first."); return false; }
     const rec = l.ended ? fromRecords(l) : { waste: null, days: null };
     setBusy(key(l));
     try {
@@ -76,12 +98,37 @@ export function TrackPage() {
       const j = await r.json();
       if (!r.ok) throw new Error(j.detail || j.error || r.statusText);
       setDraft((d) => { const n = { ...d }; delete n[key(l)]; return n; });
-      toast(`Saved: ${l.i.name}, week of ${fiso(l.ws)}.`);
-      load();
+      if (!quiet) { remember([l]); toast(`Saved: ${l.i.name}, week of ${fiso(l.ws)}. Undo is at the top of the table.`); load(); }
+      return true;
     } catch (e) {
-      toast("Not saved: " + e.message);
+      toast("Not saved: " + l.i.name + ": " + e.message);
+      return false;
     } finally {
       setBusy("");
+    }
+  };
+  // Save all: every line of the week with Yes or No chosen that is new or changed; lines without an answer are skipped
+  const saveAll = async (rows) => {
+    const todo = rows.filter((l) => state(l).implemented !== null && (draft[key(l)] || !saved(l)));
+    const skipped = rows.filter((l) => state(l).implemented === null).length;
+    if (!todo.length) { toast(skipped ? "Choose Yes or No on a line first." : "Everything is already saved."); return; }
+    const save = todo.map((l) => {
+      const st = state(l), rec = l.ended ? fromRecords(l) : { waste: null, days: null };
+      return { ...lineBody(l), implemented: st.implemented, actual_order_qty: st.implemented ? (st.qty === "" ? l.p.qty : Number(st.qty)) : (st.qty === "" ? 0 : Number(st.qty)), actual_waste_qty: rec.waste, actual_stockout_days: rec.days };
+    });
+    setBusy("all");
+    try {
+      const prevList = todo.map((l) => ({ l, prev: saved(l) || null }));
+      const r = await fetch("/api/tracking/batch", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ save }) });
+      const j2 = await r.json();
+      if (!r.ok) throw new Error(j2.detail || j2.error || r.statusText);
+      setUndo({ list: prevList });
+      setDraft((d) => { const n = { ...d }; todo.forEach((l) => delete n[key(l)]); return n; });
+      toast(`Saved ${todo.length} ${todo.length === 1 ? "line" : "lines"} together` + (skipped ? `; ${skipped} without Yes or No were skipped.` : "."));
+    } catch (e) {
+      toast("Nothing was saved: " + e.message);
+    } finally {
+      setBusy(""); load();
     }
   };
 
@@ -102,12 +149,6 @@ export function TrackPage() {
   });
   const history = Object.values(byWeek).sort((a, b) => (a.ws < b.ws ? 1 : -1));
 
-  const findings = [
-    ["Recorded", `${savedLines.length} of ${lines.length} recommended orders have a record.`],
-    ["Followed", savedLines.length ? `${nFollowed} of ${savedLines.length} recorded orders were followed (${pct(nFollowed / savedLines.length, 0)}).` : "Nothing recorded yet. Record each order after you place it."],
-    ["Why it matters", "The plan was tested only on past data. Each record builds the live evidence that confirms or corrects it."],
-  ];
-
   if (data.loading) return <div className="panel empty">Loading the tracking records…</div>;
   if (data.error) return <div className="panel"><h2>The tracking records could not be loaded</h2><p className="note">{data.error}</p><button className="linkbtn" onClick={load}>Try again</button></div>;
 
@@ -121,9 +162,9 @@ export function TrackPage() {
             info="Share of the recorded orders that were placed as recommended." />
           <Kpi label="Spent vs planned" value={savedLines.length ? peso(actualV) : "–"} delta={<span className="t-flat">{savedLines.length ? `planned ${peso(plannedV)}` : "no records yet"}</span>}
             info="What was really ordered (at standard cost) against the plan, for the recorded orders." />
-          <Kpi label="Stockout days per order" value={dF === null && dN === null ? "–" : dF === null ? "–" : dF.toFixed(1)}
+          <Kpi act={{ page: "inv", tab: "outs", hint: "Stockouts" }} label="Stockout days per order" value={dF === null && dN === null ? "–" : dF === null ? "–" : dF.toFixed(1)}
             delta={<span className="t-flat">{dN === null ? "followed orders" : `followed · ${dN.toFixed(1)} when not followed`}</span>}
-            info="Average days an ingredient ran out in the week, for orders that were followed against those that were not. Filled in from the records once the week is over." />
+            info="Average days run out per order, followed vs not. Filled in once the week is over." />
         </Kpis>
         <TabBar id="ttabs" list={[...weeks.map((w) => ["w" + w, (w === 1 ? "This week" : "Next week") + " · " + fiso(lines.find((l) => l.p.week === w).ws)]), ["hist", "History"]]} value={ttab} onChange={(v) => set({ ttab: v })} />
       </div>
@@ -135,11 +176,13 @@ export function TrackPage() {
               <div className="ph">
                 <h2>Week of {fiso(rows[0].ws)}</h2>
                 <Chip cls="flat">{rows.filter((l) => saved(l)).length} of {rows.length} recorded</Chip>
-                <Info t="Choose Yes if you placed the order as recommended, or No if you did not or changed it. Enter the quantity you really ordered. Waste and stockout days are filled in from the records once the week is over." />
+                {undo && <button className="btn noprint" style={{ marginLeft: "auto" }} disabled={!!busy} onClick={undoLast}>Undo last save</button>}
+                <button className="btn pri noprint" style={{ marginLeft: undo ? 8 : "auto" }} disabled={!!busy} onClick={() => saveAll(rows)}>Save all</button>
+                <Info t="Yes if ordered as recommended, No if not or changed. Enter what you really ordered." />
               </div>
               <div className="tablewrap">
                 <table>
-                  <thead><tr><th>Ingredient</th><th>Recommended</th><th>Followed?</th><th className="n">Really ordered</th><th className="n">Waste</th><th className="n">Stockout days</th><th></th></tr></thead>
+                  <thead><tr><th>Ingredient</th><th>Recommended</th><th>Followed?</th><th className="n">Really ordered</th><th className="n" data-t="Filled in from the records after the week">Waste</th><th className="n" data-t="Filled in from the records after the week">Stockout days</th><th></th></tr></thead>
                   <tbody>
                     {rows.map((l) => {
                       const st = state(l), s = saved(l), rec = l.ended ? fromRecords(l) : null, dirty = !!draft[key(l)];
@@ -157,8 +200,8 @@ export function TrackPage() {
                             <input type="number" min="0" step="any" className="numin" aria-label={`Quantity of ${l.i.name} really ordered`} value={st.qty}
                               disabled={st.implemented === null} placeholder={st.implemented === null ? "" : "0"} onChange={(e) => edit(l, { qty: e.target.value })} /> <small>{l.i.uom}</small>
                           </td>
-                          <td className="n">{rec ? `${num(rec.waste, 1)} ${l.i.uom}` : s && s.actual_waste_qty !== null ? `${num(s.actual_waste_qty, 1)} ${l.i.uom}` : <span className="t-flat">after the week</span>}</td>
-                          <td className="n">{rec ? rec.days : s && s.actual_stockout_days !== null ? s.actual_stockout_days : <span className="t-flat">after the week</span>}</td>
+                          <td className="n">{rec ? `${num(rec.waste, 1)} ${l.i.uom}` : s && s.actual_waste_qty !== null ? `${num(s.actual_waste_qty, 1)} ${l.i.uom}` : <span className="t-flat" data-t="Filled in from the records after the week">–</span>}</td>
+                          <td className="n">{rec ? rec.days : s && s.actual_stockout_days !== null ? s.actual_stockout_days : <span className="t-flat" data-t="Filled in from the records after the week">–</span>}</td>
                           <td className="n">
                             <button className="btn pri" disabled={busy === key(l) || st.implemented === null || (!!s && !dirty)} onClick={() => save(l)}>{busy === key(l) ? "Saving…" : s && !dirty ? "Saved" : "Save"}</button>
                             {s && !dirty && <small>{new Date(s.recorded_at).toLocaleDateString("en", { day: "numeric", month: "short" })}</small>}
@@ -196,8 +239,8 @@ export function TrackPage() {
                 </tbody>
               </table>
             </div>
-          ) : <div className="empty">No decisions recorded yet. Record each order above after you place it.</div>}
-          <div className="note">{otherPlan ? "Records are kept against the Balanced plan stored in the warehouse, which is the one the study recommends. " : ""}Records are saved to the Supabase table dw.fact_recommendation_outcome. Waste and stockout days come from the stock and waste records, so they appear once the week has passed and the daily data has been uploaded.</div>
+          ) : <div className="empty">No decisions recorded yet. Record each order on This week after you place it.</div>}
+          <NoteTip t={(otherPlan ? "Records are kept against the stored Balanced plan. " : "") + "Waste and stockout days fill in once the week's data is uploaded."} />
             </div>
           </>
         )}

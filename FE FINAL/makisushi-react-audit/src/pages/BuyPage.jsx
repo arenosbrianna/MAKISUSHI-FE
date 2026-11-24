@@ -3,8 +3,8 @@
 import { useState } from "react";
 import { D, M, LAST, BYID, fiso, fd, dtxt, idxOf, series, consumedValue, wk, nextDelivery, isWalkin, levelLabel, levelBacktest } from "../lib/model.js";
 import { peso, kpeso, num, pct, qty, daysTxt, sum, packQty } from "../lib/format.js";
-import { TabBar, BulletBar, Chip, Info, Kpi, Kpis } from "../components/ui.jsx";
-import { ComboChart, Donut } from "../components/Charts.jsx";
+import { TabBar, BulletBar, Chip, Info, Kpi, Kpis, NoteTip } from "../components/ui.jsx";
+import { ComboChart, Donut, HBars } from "../components/Charts.jsx";
 import { ActionsView } from "./Recommendations.jsx";
 import { RecommendationsPanel } from "./Recommendations.jsx";
 import { PrepKpis, PrepTable } from "./PrepPanel.jsx";
@@ -23,7 +23,7 @@ function writeDone(p, v) {
   try { localStorage.setItem(orderKey(p), v ? "1" : "0"); } catch (e) { /* not remembered */ }
 }
 const monthName = (ym) => new Date(Date.UTC(+ym.slice(0, 4), +ym.slice(5, 7) - 1, 1)).toLocaleString("en", { month: "long", timeZone: "UTC" });
-// a supplier that was late on more than 1 order in 10 over the test year
+// a supplier that was late on more than 1 order in 10 over the past year
 const lateNote = (sup) => {
   const r = (D.suppliers || []).find((s) => String(s.sup) === String(sup));
   return r && r.onTime < 0.9 ? ` · ${Math.round(r.onTime * 100)}% on time` : "";
@@ -65,7 +65,7 @@ export function PriceList({ F, exp }) {
     <div className="panel c12">
       <div className="ph">
         <h2>Price list</h2>
-        <Info t="The standard price of each ingredient and how it is sold. The purchasing plan uses these prices to cost every order." />
+        <Info t="The price of each ingredient and how it is sold. The plan costs every order with it." />
         <button className="linkbtn noprint" style={{ margin: 0 }} onClick={() => exp.current.onExport("prices")}>Export</button>
       </div>
       <div className="tablewrap">
@@ -74,7 +74,7 @@ export function PriceList({ F, exp }) {
           {body.length ? body : <tbody><tr><td colSpan={6} className="empty">No ingredients match these filters.</td></tr></tbody>}
         </table>
       </div>
-      <div className="note">Standard prices used by the plan. If a supplier changes a price, update it in the data so the plan and the budget stay correct.</div>
+      <NoteTip t="If a supplier changes a price, update it so the plan and the budget stay correct." />
     </div>
   );
 }
@@ -100,7 +100,7 @@ function WeekSeg({ S, set }) {
   );
 }
 
-// The whole 14-day plan in one table (Chapter 4, Table 4.2.3.2.1): packs for each week, the quantity and the cost.
+// The whole 14-day plan in one table: packs for each week, the quantity and the cost.
 // Orders are placed and ticked off week by week, in the "This week" and "Next week" views.
 // the value of the orders by supplier, as a ring with each supplier's share
 function SupplierDonut({ F, weeks, title }) {
@@ -109,7 +109,8 @@ function SupplierDonut({ F, weeks, title }) {
   const e = Object.entries(by).sort((x, y) => y[1] - x[1]), top = e.slice(0, 5), rest = sum(e.slice(5).map((x) => x[1]));
   if (rest > 0) top.push(["Other", rest]);
   if (!top.length) return null;
-  return <><div className="sub" style={{ marginTop: 10 }}>{title}</div><Donut items={top} size="auto" center={kpeso(sum(e.map((x) => x[1])))} sub="orders" label={title} /></>;
+  const tot = sum(e.map((x) => x[1])) || 1;
+  return <><div className="sub" style={{ marginTop: 10 }}>{title} · {kpeso(tot)}</div><HBars fill items={top.map(([n, v]) => [n, v])} fmt={(v) => kpeso(v) + " · " + (v / tot * 100).toFixed(0) + "%"} axis={kpeso} labelWidth={110} label={title} /></>;
 }
 
 function FourteenDayPlan({ F, S, set, exp }) {
@@ -152,7 +153,7 @@ function FourteenDayPlan({ F, S, set, exp }) {
     );
   }).filter(Boolean);
   exp.current.plan14 = [...expRows, ["Total", "", "", "", "", "", Math.round(total)]];
-  const bud14 = cmpBud * 14 / 30.4167;
+  const bud14 = 2 * wk(cmpBud);   // two weeks of the weekly budget (the monthly budget x 12 / 52, to the nearest ₱100), as on the Overview
   return (
     <div className="grid canvas">
       <div className="panel c8" id="p-order14">
@@ -167,14 +168,15 @@ function FourteenDayPlan({ F, S, set, exp }) {
           </table>
         </div>
         {hiddenN || S.allrows ? <button className="linkbtn noprint" onClick={() => set({ allrows: !S.allrows })}>{S.allrows ? "Show only ingredients to order" : "Show " + hiddenN + " with no order needed"}</button> : null}
-        <div className="note">The plan looks 14 days ahead and is re-solved every week; only the first week is carried out. To place orders and tick them off, or to copy the message for a supplier, choose "This week" or "Next week".</div>
+        <NoteTip t={'The plan covers 14 days and is redone every week. Choose "This week" or "Next week" to place orders.'} />
       </div>
       <div className="panel c4">
-        <div className="ph"><h2>Budget</h2><BudgetSeg S={S} set={set} /><Info t={"The plan was made for the Base budget (" + peso(M.budget.Base) + " a month). The switch changes the budget these bars are compared against, not the orders."} /></div>
-        <BulletBar value={total} target={bud14} big={peso(total)} sub={"vs " + peso(bud14) + " for 14 days"} fmt={kpeso} />
-        {bc && <BulletBar value={bc.month_total_php} target={cmpBud} big={peso(bc.month_total_php)} sub={monthName(bc.month) + " vs " + peso(cmpBud)} fmt={kpeso} />}
+        <div className="ph"><h2>Budget</h2><BudgetSeg S={S} set={set} /><Info t="The switch changes the budget the bars compare against, not the orders." /></div>
+        <BulletBar value={total} target={bud14} big={peso(total)} sub={"14-day plan vs 14-day budget " + peso(bud14)} fmt={kpeso} />
+        {bc && <BulletBar value={bc.month_total_php} target={cmpBud} big={peso(bc.month_total_php)} sub={monthName(bc.month) + " so far + this week's orders vs monthly budget " + peso(cmpBud)} fmt={kpeso} />}
         <SupplierDonut F={F} weeks={[1, 2]} title="Spend by supplier, 14 days" />
-        <div className="note">{bc ? peso(cmpBud - bc.month_total_php) + " left in " + monthName(bc.month) + ". " : ""}Purchases of the month so far, the daily market buys and the planned orders all count towards the budget.</div>
+        {bc && <div className="note">{peso(cmpBud - bc.month_total_php) + " left in " + monthName(bc.month)}</div>}
+        <NoteTip t="This month's purchases, market buys and planned orders all count." />
       </div>
     </div>
   );
@@ -291,19 +293,20 @@ export function OrdersPanel({ F, S, set, exp, msgs }) {
         {toggle}
       </div>
       <div className="panel c4">
-        <div className="ph"><h2>Budget</h2><BudgetSeg S={S} set={set} /><Info t={`The plan was made for the Base budget (${peso(M.budget.Base)} a month). The switch changes the budget these bars are compared against, not the orders.`} /></div>
-        <BulletBar value={wkSpend} target={wkb} big={peso(wkSpend)} sub={`vs ${peso(wkb)} a week`} fmt={kpeso} />
+        <div className="ph"><h2>Budget</h2><BudgetSeg S={S} set={set} /><Info t="The switch changes the budget the bars compare against, not the orders." /></div>
+        <BulletBar value={wkSpend} target={wkb} big={peso(wkSpend)} sub={`This week vs weekly budget ${peso(wkb)}`} fmt={kpeso} />
         {bc && <BulletBar value={bc.month_total_php} target={cmpBud} pace={pace} big={peso(bc.month_total_php)}
-          sub={`${monthName(bc.month)} vs ${peso(cmpBud)}`} fmt={kpeso} />}
+          sub={`${monthName(bc.month)} so far + this week's orders vs monthly budget ${peso(cmpBud)}`} fmt={kpeso} />}
         <SupplierDonut F={F} weeks={[S.week === 2 ? 2 : 1]} title="Spend by supplier, this week" />
-        <div className="note">{bc ? `${peso(cmpBud - bc.month_total_php)} left in ${monthName(bc.month)}. ` : ""}The black tick is the budget; the dashed line is where the month's spend would be by the end of this week if it were spread evenly.</div>
+        {bc && <div className="note">{`${peso(cmpBud - bc.month_total_php)} left in ${monthName(bc.month)}`}</div>}
+        <NoteTip t="Black tick: the budget. Dashed line: an even pace of spending to the end of this week." />
       </div>
     </div>
   );
 }
 
 // The owner picks the priority of the plan: Minimize waste (76% service level), Balanced (80%, recommended) or Maximize availability (95%).
-// Each one is a stored plan; choosing one loads its orders, deliveries and budget on every page. The numbers are the study's test-year backtest (Chapter 4, Figure 4.2.3.5.1).
+// Each one is a stored plan; choosing one loads its orders, deliveries and budget on every page. The numbers are each plan replayed on the past year.
 const PRIO_RUN = (key) => (key === "bal" ? D.defaultRun : key === "min" ? "min_spoilage" : "max_availability");
 function PrioritySwitch({ set }) {
   const cur = D.opt.run_id, H = D.serviceLevels ? D.serviceLevels.historical : { episodes: 296, expiry: 11905 };
@@ -313,10 +316,10 @@ function PrioritySwitch({ set }) {
       {PRIORITIES.map((p) => {
         const id = PRIO_RUN(p.key), run = (D.planRuns || []).find((r) => r.id === id), on = id === cur;
         return (
-          <button key={p.key} type="button" role="radio" aria-checked={on} data-t={"Before: " + num(H.episodes) + " stockouts, " + peso(H.expiry) + " waste in a year"} className={"prio-opt" + (on ? " on" : "")} disabled={!run} onClick={() => set({ planRun: id })}>
+          <button key={p.key} type="button" role="radio" aria-checked={on} data-t={"Past year if used: " + num(p.episodes) + " stockouts, " + peso(p.expiry) + " waste. Before: " + num(H.episodes) + ", " + peso(H.expiry) + "."} className={"prio-opt" + (on ? " on" : "")} disabled={!run} onClick={() => set({ planRun: id })}>
             <span className="po-h"><b>{p.label}</b>{p.recommended && <Chip cls="good">Recommended</Chip>}{on && <Chip cls="flat">Loaded</Chip>}</span>
             <span className="po-s">{levelLabel(run ? run.level : 0)} service level</span>
-            <span className="po-row"><span className="po-n"><b>{num(p.episodes)}</b> stockouts</span><span className="po-n"><b>{peso(p.expiry)}</b> waste in a year</span><span className="po-n"><b>{run ? kpeso(run.purchase_php) : "–"}</b> 14 days</span></span>
+            <span className="po-row"><span className="po-n"><b>{num(p.episodes)}</b> stockouts</span><span className="po-n"><b>{peso(p.expiry)}</b> waste in a year</span><span className="po-n"><b>{run ? peso(run.purchase_php) : "–"}</b> 14 days</span></span>
           </button>
         );
       })}
@@ -325,10 +328,8 @@ function PrioritySwitch({ set }) {
   );
 }
 
-// What each service level from 80% to 99% trades off in the study's test-year backtest (Chapter 4, Figure 4.2.3.3.6), and the switch
-// that loads that level's 14-day plan from the warehouse. A higher level runs out less but expires more; the study's rule is that expiry
-// must not be above today's way of ordering, which holds up to 88%.
-const LEVEL_NOTE = { 0.8: "Balanced, recommended", 0.88: "highest with expiry below today's", 0.98: "lowest net cost on the tuning year" };
+// What each service level from 80% to 99% would have changed over the past year, and the switch that loads that level's
+// 14-day plan from the warehouse. A higher level runs out less but wastes more; up to 88% it wastes less than before.
 function ServiceLevelPanel({ set }) {
   const SL = D.serviceLevels, runs = (D.planRuns || []).filter((r) => !r.owner);
   if (!SL || runs.length < 2) return null;
@@ -342,12 +343,13 @@ function ServiceLevelPanel({ set }) {
   const x = rows.map((r) => levelLabel(r.run.level));
   const dEp = bt.episodes - base.bt.episodes, dEx = bt.expiry - base.bt.expiry;
   const shown = rows.filter((r, k) => k === selIdx || [0.8, 0.84, 0.88, 0.9, 0.94, 0.98, 0.99].some((l) => Math.abs(r.run.level - l) < 1e-9));
-  const barCol = (v, k, over) => (k === selIdx && !owner ? "var(--accent)" : over ? "#F2B8A2" : "#93A4D6");
+  const barCol = (v, k, over) => (k === selIdx && !owner ? "var(--accent)" : over ? "#CC7A2E" : "#6B85C9");
+  const firstOver = rows.find((r) => r.bt.expiry > H.expiry);
   return (
     <>
       <div className="panel c5">
         <div className="ph"><h2>What each service level changes</h2>
-          <Info t={"The warehouse stores the 14-day plan at every service level from 80% to 99%; the admin can load any of them. The figures are the study's test-year backtest (" + SL.period + ") against how the restaurant ordered before. Waste here is stock kept past its shelf life."} /></div>
+          <Info t={"Each level replayed on the past year (" + SL.period + "), against how the restaurant ordered. Click a row to load it."} /></div>
         <div className="tablewrap fitc">
           <table>
             <thead><tr><th>Level</th><th className="n">Stockouts</th><th className="n">Waste in a year</th><th className="n">Net cost</th></tr></thead>
@@ -371,38 +373,38 @@ function ServiceLevelPanel({ set }) {
         <input id="selLevel" className="wi-range" type="range" min={0} max={rows.length - 1} step={1} value={selIdx}
           onChange={(e) => set({ planRun: rows[+e.target.value].run.id })} aria-label="Service level" />
         <div className="wi-ends"><span>{levelLabel(rows[0].run.level)}</span><span>{levelLabel(rows[rows.length - 1].run.level)}</span></div>
-        <div className="wi-verdict"><Chip cls={within ? "good" : "warn"}>{within ? "Waste below before: inside the study rule" : "Waste above before: over the study rule"}</Chip></div>
+        <div className="wi-verdict"><Chip cls={within ? "good" : "warn"}>{within ? "Less waste than before" : "More waste than before"}</Chip></div>
         <dl className="facts">
           <dt>Stockouts</dt><dd><b>{num(bt.episodes)}</b> <small>before {num(H.episodes)}</small></dd>
           <dt>Waste in a year</dt><dd><b>{peso(bt.expiry)}</b> <small>before {peso(H.expiry)}</small></dd>
-          <dt>Demand met</dt><dd><b>{pct(bt.fill, 1)}</b> <small>before {pct(H.fill, 1)}</small></dd>
+          <dt>Fill rate</dt><dd><b>{pct(bt.fill, 1)}</b> <small>before {pct(H.fill, 1)}</small></dd>
           <dt>Next 14 days</dt><dd><b>{peso(D.opt.purchase_php || sum(D.plan.map((p) => p.cost)))}</b> <small>{num(sum(D.plan.map((p) => p.packs)))} packs</small></dd>
         </dl>
       </div>
       <div className="panel c6">
-        <div className="ph"><h2>Stockout episodes</h2><Info t="Times an ingredient ran out in the test year at each service level. Fewer is better. The dark bar is the level that is loaded." /></div>
+        <div className="ph"><h2>Stockout episodes</h2><Info t="Stockouts each level would have had over the past year. The dark bar is loaded." /></div>
         <ComboChart x={x} h={200} yfmt={num} bars={[{ vals: rows.map((r) => r.bt.episodes), colors: rows.map((r, k) => barCol(r.bt.episodes, k, false)), name: "Stockout episodes", fmt: num }]}
           refs={[{ y: H.episodes, label: "", color: "var(--bad)" }]} />
         <div className="legend"><span><i style={{ background: "var(--bad)" }} />Before: {num(H.episodes)} episodes</span></div>
       </div>
       <div className="panel c6">
-        <div className="ph"><h2>Waste in a year</h2><Info t="Waste in pesos a year (stock kept past its shelf life, as the backtest simulates it). Lower is better. Red bars waste more than the restaurant's current way of ordering." /></div>
+        <div className="ph"><h2>Waste in a year</h2>{firstOver && <Chip cls="warn">More waste than before from {levelLabel(firstOver.run.level)}</Chip>}<Info t="Waste each level would have had over the past year. Orange bars waste more than before." /></div>
         <ComboChart x={x} h={200} yfmt={kpeso} bars={[{ vals: rows.map((r) => r.bt.expiry), colors: rows.map((r, k) => barCol(r.bt.expiry, k, r.bt.expiry > H.expiry)), name: "Waste in a year", fmt: peso }]}
           refs={[{ y: H.expiry, label: "", color: "var(--bad)" }]} />
-        <div className="legend"><span><i style={{ background: "var(--bad)" }} />Before: {peso(H.expiry)}</span><span><i style={{ background: "#F2B8A2" }} />More than before</span></div>
+        <div className="legend"><span><i style={{ background: "var(--bad)" }} />Before: {peso(H.expiry)}</span><span><i style={{ background: "#CC7A2E" }} />More waste than before</span></div>
       </div>
     </>
   );
 }
 
-// Supplier delivery record over the test year: each purchase order against the first delivery after it
+// Supplier delivery record over the past year: each purchase order against the first delivery after it
 function SupplierRecord() {
   const S = D.suppliers || [];
   if (!S.length) return null;
   const advice = (s) => (s.onTime < 0.9 ? "Order a day early for items that must not run out" : s.qtyRatio < 0.98 ? "Check quantities on delivery" : "Reliable");
   return (
     <div className="panel c12">
-      <div className="ph"><h2>Supplier delivery record</h2><Info t="Each purchase order in the test year matched with the first delivery of that ingredient after it." /></div>
+      <div className="ph"><h2>Supplier delivery record</h2><Info t="Each order over the past year matched with the first delivery after it." /></div>
       <div className="tablewrap fitc">
         <table>
           <thead><tr><th>Supplier</th><th className="n">Orders</th><th className="n">Promised</th><th className="n">Average wait</th><th className="n">On time</th><th className="n">Longest wait</th><th className="n">Delivered vs ordered</th><th>What to do</th></tr></thead>
@@ -422,7 +424,7 @@ function SupplierRecord() {
           </tbody>
         </table>
       </div>
-      <div className="note">On time means delivered within the promised lead time. {D.pricesChanged ? "" : "Prices did not change over the period: every delivery was at the standard price, so there is no price trend to track."}</div>
+      <NoteTip t={"On time: delivered within the promised lead time." + (D.pricesChanged ? "" : " Prices did not change, so there is no price trend.")} />
     </div>
   );
 }

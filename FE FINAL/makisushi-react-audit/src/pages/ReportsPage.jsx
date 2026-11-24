@@ -1,7 +1,7 @@
 // Reports: ready-made reports for the owner, the kitchen and the suppliers. Pick one on the left to see its numbers, its chart and its table,
 // and download it as a PDF (the chart and the whole table) or as a spreadsheet (CSV). Reports that cover a period follow the Period filter.
 import { useRef } from "react";
-import { D, LAST, BYID, ING, win, fd, fiso, series, wasteIn, purchaseValue, firstArrival, staffPerDay, isWalkin } from "../lib/model.js";
+import { D, LAST, BYID, ING, win, fd, fiso, series, wasteIn, purchaseValue, firstArrival, staffPerDay, isWalkin, fcRange } from "../lib/model.js";
 import { peso, kpeso, num, pct, qty, sum, packQty } from "../lib/format.js";
 import { Info } from "../components/ui.jsx";
 import { Icon } from "../components/Icons.jsx";
@@ -21,7 +21,7 @@ function printReport(r, chartEl, dataDate, toast) {
   if (!area) return;
   const esc = (v) => String(v ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;");
   const [head, ...body] = r.rows;
-  area.innerHTML = `<h2>${esc(r.title)}</h2><p>Makisushi Japanese Restaurant · data as of ${esc(dataDate)}${r.period ? " · " + esc(r.period) : ""}</p>`
+  area.innerHTML = `<h2>${esc(r.title)}</h2><p>Makisushi Japanese Restaurant · data as of ${esc(dataDate)}${r.period ? " · " + esc(r.period) : ""} · made ${esc(new Date().toLocaleString("en-PH", { dateStyle: "medium", timeStyle: "short" }))}</p>`
     + `<p><b>${r.facts.map(([l, v]) => esc(l) + ": " + esc(v)).join("  ·  ")}</b></p>`
     + `<h3>${esc(r.chartTitle)}</h3><div class="rep-chart">${chartEl && chartEl.lastElementChild ? chartEl.lastElementChild.outerHTML : ""}</div>`
     + (r.messages && r.messages.length ? `<h3>Messages for the suppliers</h3>${r.messages.map((m) => `<pre>${esc(m.text)}</pre>`).join("")}` : "")
@@ -39,7 +39,7 @@ function buildReports(F, S) {
   {
     const lines = D.plan.filter((p) => set_.has(p.ing) && p.qty > 0).sort((a, b) => (BYID[a.ing].supname < BYID[b.ing].supname ? -1 : BYID[a.ing].supname > BYID[b.ing].supname ? 1 : a.week - b.week));
     const rows = [["Week", "Supplier", "Contact", "Ingredient", "Packs", "Pack size", "Quantity", "Unit", "Cost (PHP)", "Delivery", "How"],
-      ...lines.map((p) => { const i = BYID[p.ing], a = firstArrival(p.ing, p.week); return [p.week, i.supname, isWalkin(i) ? "walk-in grocery" : i.contact, i.name, p.packs, packQty(i.pack, i.uom), Math.round(p.qty), i.uom, Math.round(p.cost), a || "", isWalkin(i) ? "buy in store" : "order from supplier"]; })];
+      ...lines.map((p) => { const i = BYID[p.ing], a = firstArrival(p.ing, p.week); return [p.week, i.supname, isWalkin(i) ? "walk-in grocery" : i.contact, i.name, p.packs, packQty(i.pack, i.uom), Math.round(p.qty), i.uom, Math.round(p.cost), a ? fiso(a) + " " + a.slice(0, 4) : "", isWalkin(i) ? "buy in store" : "order from supplier"]; })];
     const by = {};
     lines.forEach((p) => { by[p.ing] = (by[p.ing] || 0) + p.cost; });
     const items = Object.entries(by).map(([id, v]) => [BYID[id].name, v, +id]).sort((a, b) => b[1] - a[1]).slice(0, 12);
@@ -107,13 +107,14 @@ function buildReports(F, S) {
   {
     const n14 = Math.min(14, D.fdates.length);
     const rows = [["Ingredient", "Unit", "Next 7 days", "Next 14 days", "Likely range, low", "Likely range, high", "Trust"],
-      ...F.map((i) => { const f = D.fcRaw[i.id]; return [i.name, i.uom, Math.round(sum(f.y.slice(0, 7))), Math.round(sum(f.y.slice(0, n14))), Math.round(sum(f.lo.slice(0, n14))), Math.round(sum(f.hi.slice(0, n14))), confidence(i.id).label]; })];
+      ...F.map((i) => { const f = D.fcRaw[i.id], t = sum(f.y.slice(0, n14)), g = fcRange([i.id], 14); return [i.name, i.uom, Math.round(sum(f.y.slice(0, 7))), Math.round(t), g ? Math.round(t * g.lo) : "", g ? Math.round(t * g.hi) : "", confidence(i.id).label]; })];
     const day = (key, k) => sum(F.map((i) => D.fcRaw[i.id][key][k] * i.cost));
     const x = D.fdates.slice(0, n14).map(fiso);
     out.push({ id: "forecast", title: "Forecast, next 14 days", desc: "Expected use of each ingredient, the likely range and how far to trust it.", rows, file: "forecast_14_days",
-      facts: [["Next 7 days", peso(sum(F.map((i) => sum(D.fcRaw[i.id].y.slice(0, 7)) * i.cost)))], ["Next 14 days", peso(sum(F.map((i) => sum(D.fcRaw[i.id].y.slice(0, n14)) * i.cost)))], ["Window", `${fiso(D.fdates[0])} to ${fiso(D.fdates[n14 - 1])}`]],
-      chartTitle: "Expected use per day, in pesos, with the range it should fall in 4 times out of 5",
-      chart: <ComboChart x={x} h={240} yfmt={kpeso} lines={[{ vals: x.map((_, k) => day("y", k)), lo: x.map((_, k) => day("lo", k)), hi: x.map((_, k) => day("hi", k)), color: "var(--warn)", name: "Forecast", fmt: peso }]} /> });
+      facts: (() => { const ids = F.map((i) => i.id), t7 = sum(F.map((i) => sum(D.fcRaw[i.id].y.slice(0, 7)) * i.cost)), t14 = sum(F.map((i) => sum(D.fcRaw[i.id].y.slice(0, n14)) * i.cost)), g7 = fcRange(ids, 7), g14 = fcRange(ids, 14), rr = (v, g) => (g ? " (likely " + peso(Math.round(v * g.lo / 100) * 100) + "–" + peso(Math.round(v * g.hi / 100) * 100) + ")" : "");
+        return [["Next 7 days", peso(t7) + rr(t7, g7)], ["Next 14 days", peso(t14) + rr(t14, g14)], ["Window", `${fiso(D.fdates[0])} to ${fiso(D.fdates[n14 - 1])}`]]; })(),
+      chartTitle: "Expected use per day, in pesos, with the range it fell in on 8 of 10 days over the past year",
+      chart: (() => { const g1 = fcRange(F.map((i) => i.id), 1), y = x.map((_, k) => day("y", k)); return <ComboChart x={x} h={240} yfmt={kpeso} lines={[{ vals: y, lo: y.map((v, k) => (g1 ? v * g1.lo : day("lo", k))), hi: y.map((v, k) => (g1 ? v * g1.hi : day("hi", k))), color: "var(--warn)", name: "Forecast", fmt: peso }]} />; })() });
   }
   // 7. ingredient use and staff meals
   {
@@ -174,7 +175,7 @@ export function ReportsPage({ F }) {
             <button className="btn" type="button" onClick={() => downloadCsv(`makisushi_${r.file}_${stamp()}.csv`, r.rows, toast)}>Download CSV</button>
           </div>
         </div>
-        <p className="rep-d">{r.desc}{r.period ? " " + r.period + "." : ""}</p>
+        <p className="rep-d">{r.desc} <span className="chip flat" data-t={"Data as of " + asof + (r.period ? ", " + r.period : "")}>Made {new Date().toLocaleString("en-PH", { dateStyle: "medium", timeStyle: "short" })}</span></p>
         <dl className="rep-f">{r.facts.map(([l, v]) => <div key={l}><dt>{l}</dt><dd>{v}</dd></div>)}</dl>
       </div>
       <div className="panel c9" ref={chartRef}>
@@ -182,11 +183,11 @@ export function ReportsPage({ F }) {
         {r.chart}
       </div>
       <div className="panel c9">
-        <div className="ph"><h2>The report</h2><span className="note-inline">{num(r.rows.length - 1)} rows, all in the download</span></div>
+        <div className="ph"><h2>The report</h2><span className="note-inline">first {Math.min(10, r.rows.length - 1)} of {num(r.rows.length - 1)} rows · all in the download</span></div>
         <div className="tablewrap">
           <table>
             <thead><tr>{r.rows[0].map((h) => <th key={h}>{h}</th>)}</tr></thead>
-            <tbody>{r.rows.slice(1, 40).map((row, k) => <tr key={k}>{row.map((c, j) => <td key={j}>{c}</td>)}</tr>)}</tbody>
+            <tbody>{r.rows.slice(1, 11).map((row, k) => <tr key={k}>{row.map((c, j) => <td key={j}>{c}</td>)}</tr>)}</tbody>
           </table>
         </div>
       </div>

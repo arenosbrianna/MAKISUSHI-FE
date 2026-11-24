@@ -1,7 +1,7 @@
 // Recommended actions: the prescriptive part in words. Hold back overstock, top up before a
 // run-out, smaller orders for the ingredients that lose the most, and weather and season advice for mango shakes, juice and drinks.
 import { useState } from "react";
-import { Chip, Info, Legend } from "../components/ui.jsx";
+import { Chip, Info, Legend, NoteTip } from "../components/ui.jsx";
 import { Donut, HBars } from "../components/Charts.jsx";
 import { stockStatus } from "./InvPage.jsx";
 import { daysTxt } from "../lib/format.js";
@@ -36,7 +36,7 @@ export function RecommendationsPanel({ F, limit = 8, title = "Recommended action
       <div className="ph">
         <h2>{title}</h2>
         <Chip cls={recs.some((r) => r.lvl === "bad") ? "bad" : recs.length ? "warn" : "good"}>{recs.length ? `${recs.length} actions` : "Nothing to act on"}</Chip>
-        <Info t="What the system recommends doing, drawn from the stock, the forecast, the plan, the waste records and the weather. Promotions and use-first actions are for stock close to expiry; the weather advice uses the effect measured on sales. Click an action to open the page behind it." />
+        <Info t="What to do now, from the stock, forecast, plan, waste and weather. Click an action to open the page behind it." />
         {recs.length > limit && <button className="linkbtn noprint" style={{ margin: 0 }} onClick={() => setAll(!all)}>{all ? "Show fewer" : `Show all ${recs.length}`}</button>}
       </div>
       <div className="tablewrap">
@@ -53,7 +53,7 @@ export function RecommendationsPanel({ F, limit = 8, title = "Recommended action
           </tbody>
         </table>
       </div>
-      <div className="note">{wx ? `Weather advice uses the live forecast (${wx.source}, ${wx.location}) and the season (${wx.season.label}).` : "Weather advice appears when the weather service answers."}</div>
+      <NoteTip t={wx ? `Weather advice uses the live forecast (${wx.source}, ${wx.location}) and the season (${wx.season.label}).` : "Weather advice appears when the weather service answers."} />
     </div>
   );
 }

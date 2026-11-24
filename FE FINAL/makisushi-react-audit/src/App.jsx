@@ -28,6 +28,18 @@ import { LoginPage } from "./login/LoginPage.jsx";
 import { AccountMenu } from "./login/AccountMenu.jsx";
 import { wasSignedIn, rememberSignIn, forgetSignIn } from "./login/auth.js";
 
+// the loading screen: what is happening, and how long it has taken (the first load after the server starts can take a minute)
+function LoadingNote() {
+  const [sec, setSec] = useState(0);
+  useEffect(() => { const t = setInterval(() => setSec((s) => s + 1), 1000); return () => clearInterval(t); }, []);
+  return (
+    <div className="panel empty" role="status">
+      <b>Loading the dashboard data from Supabase… {sec} s</b>
+      <p className="note">The first load after the server starts reads every table and can take up to a minute and a half. After that, pages open at once.</p>
+    </div>
+  );
+}
+
 const initialPage = () => {
   try {
     const h = window.location.hash.slice(1);
@@ -39,7 +51,7 @@ const initialPage = () => {
 const initialState = () => ({
   topcat: "", topby: "n", year: null, month: "", yoyBy: "total", report: "orders", wyear: "",
   showHelp: false, allrows: false, invAll: false, heat: "all", ptab: "forecast", lr: 12, planRun: null,
-  wi: 1, week: 0, grain: "", range: 90, cat: "", ing: 0, sup: 0,
+  wi: 1, week: 0, grain: "", range: 90, cat: "", chan: "", mixBy: "cat", agg: "year", ing: 0, sup: 0,
   store: "", scen: "Base", sel: 0,
   stab: "overview", ttab: "w1", itab: "status", wtab: "where", btab: "orders",
   page: initialPage(),
@@ -90,13 +102,13 @@ export default function App() {
     toastTimer.current = setTimeout(() => setToastMsg(null), 2400);
   }, []);
   const goto = useCallback((page) => {
-    set({ page, cat: "" });
+    set({ page, cat: "", chan: "" });
     try { history.replaceState(null, "", "#" + page); } catch (e) { /* ignore */ }
     window.scrollTo(0, 0);
   }, [set]);
 
   const openTab = useCallback((page, key, value) => {
-    set({ page, [key]: value, cat: "" });
+    set({ page, [key]: value, cat: "", chan: "" });
     try { history.replaceState(null, "", "#" + page); } catch (e) { /* ignore */ }
   }, [set]);
 
@@ -119,7 +131,7 @@ export default function App() {
     return <LoginPage onSignIn={() => { rememberSignIn(); setSignedIn(true); }} />;
   }
   if (status.loading) {
-    return <Screen><div className="panel empty">Loading the dashboard data from Supabase…</div></Screen>;
+    return <Screen><LoadingNote /></Screen>;
   }
   if (status.error) {
     return (
@@ -138,6 +150,7 @@ export default function App() {
   const ageDays = Math.floor((Date.now() - (D0 + LAST * 864e5)) / 864e5);
   const stale = ageDays > 2;
   const dataPill = `Data as of ${fd(LAST, true)}`;
+  const UPLOAD_FORM = "https://proficient-mouse.pikapod.net/form/makisushi-upload-7h3k9q";
   const h = HEADS[S.page];
 
   let body;
@@ -158,8 +171,9 @@ export default function App() {
           <a className="logo" href="#today" onClick={(e) => { e.preventDefault(); goto("today"); }} aria-label="Makisushi Japanese Restaurant"><img src="/logo.png" alt="Makisushi Japanese Restaurant" /></a>
           <div className="topr">
             <span className={`pill${stale ? " stale" : ""}`} title={stale ? "The data has not been updated for more than 2 days. Send the latest daily upload." : undefined}>
-              <span className="dot" /><span id="datapill">{dataPill}</span>
+              <span className="dot" /><span id="datapill">{dataPill}{stale ? ` · ${ageDays} days old` : ""}</span>
             </span>
+            {stale && <a className="btn pri noprint upl" href={UPLOAD_FORM} target="_blank" rel="noreferrer">Upload the latest data</a>}
           </div>
         </header>
 
@@ -192,6 +206,7 @@ export default function App() {
             <div className="nav-acct"><AccountMenu user="Admin" onSignOut={signOut} /></div>
           </nav>
           <div className="pbi-main">
+          {SUBTABS[S.page] && <div className="phone-subnav noprint" aria-label="Sub-pages">{SUBTABS[S.page].list.map(([v, l]) => <button key={v} aria-current={tabOf(S.page, S) === v ? "true" : undefined} onClick={() => openTab(S.page, SUBTABS[S.page].key, v)}>{l}</button>)}</div>}
           {Object.values(filtersFor(S)).some(Boolean) && <div className="pbi-slicers noprint" id="filters" aria-label="Filters"><Controls F={F} /></div>}
           <main className="pbi-page" id="main">
             <div className="pagehead">

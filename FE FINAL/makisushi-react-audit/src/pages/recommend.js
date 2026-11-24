@@ -1,4 +1,4 @@
-// The prescriptive recommendations (manuscript Sections 1.4 e, 3.3.6 and 3.4.6): what to do about the stock and the plan, in words.
+// The prescriptive recommendations: what to do about the stock and the plan, in words.
 // Each one names the ingredient, the action and the reason. Holding back overstock,
 // topping up before a run-out, smaller orders for the ingredients that lose the most to waste, limiting slow movers, and
 // weather and season advice from the measured effect on sales (mango shakes and juice, drinks).
@@ -10,7 +10,7 @@ import { seasonImpact, HOT_DAY, seasonOfIso, nextSeason } from "../lib/seasons.j
 // kind -> chip colour
 export const KIND_CLS = { "Order now": "bad", "Top up": "warn", "Hold back": "flat", "Smaller orders": "flat", "Limit orders": "flat", Weather: "good", Season: "flat" };
 const ORDER = ["Order now", "Weather", "Top up", "Hold back", "Smaller orders", "Limit orders", "Season"];
-const pc = (v) => (v >= 0 ? "+" : "−") + Math.abs(Math.round(v * 100)) + "%";
+const pc = (v) => (Math.round(v * 100) === 0 ? "0%" : (v >= 0 ? "+" : "−") + Math.abs(Math.round(v * 100)) + "%");
 
 // the best-selling dishes that use an ingredient, with the plates that would use up a quantity of it
 function dishesFor(id, left, sold) {
@@ -96,7 +96,7 @@ export function buildRecommendations(F, wx) {
 export function weatherRecs(wx, push) {
   if (!wx) return;
   const imp = seasonImpact(), M = imp.by.mango, Dr = imp.by.drinks, MI = imp.by.mangoIng;
-  const next7 = wx.days.filter((d) => !d.past).slice(0, 7), hot = next7.filter((d) => d.hi != null && d.hi >= HOT_DAY), peak = Math.max(...next7.map((d) => d.hi ?? 0));
+  const next7 = wx.days.filter((d) => d.date > wx.today).slice(0, 7), hot = next7.filter((d) => d.hi != null && d.hi >= HOT_DAY), peak = Math.max(...next7.map((d) => d.hi ?? 0));
   const mango = Object.values(BYID).find((i) => /mango/i.test(i.name));
   const season = seasonOfIso(wx.today), nx = nextSeason(wx.today);
   const mangoFc = mango ? sum(D.fc[mango.id].y.slice(0, 7)) : 0;

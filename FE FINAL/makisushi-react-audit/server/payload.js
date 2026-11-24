@@ -19,11 +19,31 @@ const toUTC = (s) => Date.UTC(+s.slice(0, 4), +s.slice(5, 7) - 1, +s.slice(8, 10
 const monthYear = (s) => new Date(toUTC(s)).toLocaleString("en-GB", { month: "short", year: "numeric", timeZone: "UTC" });
 const normName = (s) => String(s || "").toLowerCase().replace(/\[[^\]]*\]/g, "").replace(/[^a-z0-9]/g, "");
 
+// All the queries of one dashboard build run in one read-only transaction at REPEATABLE READ, so they all see the same snapshot
+// of the warehouse: an upload that commits while the dashboard is being built is either wholly in it or wholly left for the next build.
+let tx = null;
 async function q(text, params = []) {
-  return (await pool.query(text, params)).rows;
+  return (await (tx || pool).query(text, params)).rows;
 }
 
 export async function buildDashboardPayload() {
+  const client = await pool.connect();
+  try {
+    await client.query("begin isolation level repeatable read read only");
+    tx = client;
+    const out = await buildFromSnapshot();
+    await client.query("commit");
+    return out;
+  } catch (e) {
+    try { await client.query("rollback"); } catch (e2) { /* the connection is already gone */ }
+    throw e;
+  } finally {
+    tx = null;
+    client.release();
+  }
+}
+
+async function buildFromSnapshot() {
   // ---- calendar: day 0 is the first snapshot date; the last day is the latest snapshot ----
   const [span] = await q(`select min(snapshot_date) as d0, max(snapshot_date) as asof from dw.fact_inventory_snapshot`);
   const d0 = span.d0, asof = span.asof;
@@ -92,9 +112,10 @@ export async function buildDashboardPayload() {
                           join dw.dim_menu_category c on c.category_id = i.category_id
                           where s.is_revenue group by 1, 2, 3 order by 1, 2, 3`))
     .map((r) => [dayIdx(r.sale_date), catIdx[r.cat], chanIdx[r.channel], round(+r.net, 2), +r.qty, +r.lines]);
-  const isales = (await q(`select sale_date, item_id, sum(quantity_sold) as q, sum(net_sales) as n
-                           from dw.fact_sales where is_revenue group by 1, 2`))
-    .map((r) => [dayIdx(r.sale_date), r.item_id, +r.q, round(+r.n, 2)]);
+  // dish sales per day and channel (the fifth field is the channel's index in chans), so the Sales page can show one channel
+  const isales = (await q(`select sale_date, item_id, channel, sum(quantity_sold) as q, sum(net_sales) as n
+                           from dw.fact_sales where is_revenue group by 1, 2, 3`))
+    .map((r) => [dayIdx(r.sale_date), r.item_id, +r.q, round(+r.n, 2), chanIdx[r.channel]]);
   const items = {};
   for (const r of await q(`select i.item_id, i.item_name, c.category_name as cat, i.is_active
                            from dw.dim_menu_item i left join dw.dim_menu_category c on c.category_id = i.category_id

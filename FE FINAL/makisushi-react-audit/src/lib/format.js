@@ -11,5 +11,7 @@ export const qty = (q, uom) => uom === "g"
   : whole(q) + (uom === "pc" ? (Math.round(q) === 1 ? " pc" : " pcs") : (Math.round(q) === 1 ? " serving" : " servings"));
 // a pack size shown as a round number: grams to the nearest 100 (980 g -> 1 kg, 460 g -> 500 g), under 100 g to the nearest 50
 export const packQty = (q, uom) => qty(uom === "g" ? (q >= 100 ? Math.round(q / 100) * 100 : Math.max(50, Math.round(q / 50) * 50)) : Math.round(q), uom);
+// a number of days with the right word: "<1 day", "1 day", "5 days"
+export const daysWord = (d) => { const t = daysTxt(d); return t + (t === "1" || t.startsWith("<") ? " day" : " days"); };
 export const sum = (a) => a.reduce((x, y) => x + y, 0);
 export const csvCell =(v) => { const s = String(v == null ? "" : v); return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; };

@@ -1,11 +1,14 @@
 // Live weather from the server (/api/weather, Open-Meteo), loaded once and refreshed every 30 minutes.
 import { useEffect, useState } from "react";
+import { LAST, dateOf } from "./model.js";
 
 let cached = null, at = 0, pending = null;
 function load() {
   if (cached && Date.now() - at < 30 * 60 * 1000) return Promise.resolve(cached);
   if (!pending) {
-    pending = fetch("/api/weather").then(async (r) => {
+    // the weather of the data's dates: the latest upload and the 14 days of the plan
+    const asof = dateOf(LAST).toISOString().slice(0, 10);
+    pending = fetch("/api/weather?asof=" + asof).then(async (r) => {
       const j = await r.json();
       if (!r.ok) throw new Error(j.detail || j.error || r.statusText);
       cached = j; at = Date.now();

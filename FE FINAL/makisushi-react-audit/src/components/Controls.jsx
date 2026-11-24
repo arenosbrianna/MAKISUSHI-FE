@@ -2,9 +2,9 @@
 // (and tab) that is open are shown, and the ingredient list only offers the ingredients the other filters leave.
 import { D, N, ING, MONTHS, dateOf, D0 } from "../lib/model.js";
 import { useApp } from "../AppContext.js";
-import { SHORT_RANGE as SHORTS, rangeChoices, tabOf } from "../lib/constants.js";
+import { SHORT_RANGE as SHORTS, rangeChoices, tabOf, chanName } from "../lib/constants.js";
 
-const RESET = { wyear: "", year: null, month: "", range: 90, cat: "", ing: 0, sup: 0, store: "", sel: 0 };
+const RESET = { wyear: "", year: null, month: "", range: 90, cat: "", chan: "", ing: 0, sup: 0, store: "", sel: 0 };
 
 // which filters a page or tab uses
 export function filtersFor(S) {
@@ -15,7 +15,7 @@ export function filtersFor(S) {
     case "reports": return { period: true };
     case "track": return none;
     case "sales": return tab === "overview" || tab === "products"
-      ? { period: true, menuCategory: true }
+      ? { period: true, menuCategory: true, channel: true }
       : { period: true, storage: true, supplier: true, ingredient: true };
     case "waste": return { period: true, storage: true, supplier: true, ingredient: true };
     case "inv": return { period: true, storage: true, supplier: true, ingredient: true };
@@ -37,7 +37,7 @@ export function Controls() {
     const a = Date.UTC(S.year, m, 1), b = Date.UTC(S.year, m + 1, 0);
     return b >= D0 && a <= D0 + (N - 1) * 864e5;
   }) : [];
-  const changed = !!((use.weatherYear && S.wyear) || (use.period && (S.year || S.month || S.range !== 90)) || (use.menuCategory && S.cat) || (use.ingredient && S.ing) || (use.supplier && S.sup) || (use.storage && S.store));
+  const changed = !!((use.weatherYear && S.wyear) || (use.period && (S.year || S.month || S.range !== 90)) || (use.menuCategory && S.cat) || (use.channel && S.chan) || (use.ingredient && S.ing) || (use.supplier && S.sup) || (use.storage && S.store));
   const slicer = (title, inner) => <label className="slc"><span>{title}</span>{inner}</label>;
 
   const periodCur = S.year ? "y:" + S.year : "d:" + S.range;
@@ -81,6 +81,12 @@ export function Controls() {
         <select id="f-cat" value={S.cat} onChange={(e) => set({ cat: e.target.value })}>
           <option value="">All</option>
           {D.cats.map((c) => <option key={c} value={c}>{c}</option>)}
+        </select>
+      ))}
+      {use.channel && D.chans && D.chans.length > 1 && slicer("Channel", (
+        <select id="f-chan" value={S.chan || ""} onChange={(e) => set({ chan: e.target.value })}>
+          <option value="">All</option>
+          {D.chans.map((c) => <option key={c} value={c}>{chanName(c)}</option>)}
         </select>
       ))}
       {use.storage && slicer("Storage", (

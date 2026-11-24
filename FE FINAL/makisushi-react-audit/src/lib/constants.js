@@ -1,7 +1,7 @@
 // Page names, help text and fixed colours, copied from the original page.
 import { N } from "./model.js";
 
-// The seven views of the DSS (manuscript Section 4.3): Overview, Purchasing, Tracking, Expiry and waste,
+// The seven views of the DSS: Overview, Purchasing, Tracking, Expiry and waste,
 // Stock risk, Forecast, and Sales and ingredient use.
 export const NAVN = { today: "Overview", buy: "Purchasing", track: "Tracking", waste: "Waste", inv: "Stock risk", pred: "Forecast", sales: "Sales & use", reports: "Reports" };
 // ordered by the decision flow: act first, then what to watch, then what happened
@@ -33,15 +33,7 @@ export function tabOf(page, S) {
 }
 export const NAV_GROUPS = ["What to do", "What to watch", "What happened", "Reports"];
 
-// Test-year backtest of the recommended Balanced plan against historical ordering (Chapter 4, Sections 4.2.3.3 and 4.2.3.5;
-// 7 Sep 2025 to 8 Sep 2026, 367 days). These are results of the study's model runs, not of the live database.
-export const BACKTEST = {
-  period: "7 Sep 2025 to 8 Sep 2026",
-  hist: { episodes: 296, expiry: 11905, avgStock: 27447, fill: 0.973, problems: 119625 },
-  plan: { episodes: 180, expiry: 9077, avgStock: 22104, fill: 0.975, problems: 105898 },
-  spoilage: 10232,   // estimated outside the backtest; the same for both ordering rules, never added to expiry
-};
-// The three owner priorities (Chapter 4, Figure 4.2.3.5.1), each at the Base budget of ₱87,000 a month.
+// The three owner priorities, each at the Base budget of ₱87,000 a month, replayed on the past year.
 export const PRIORITIES = [
   { key: "min", label: "Minimize waste", setting: "76% service level, waste penalised at 0.5× cost", episodes: 214, expiry: 7816, problems: 117614,
     fit: "For an owner whose main concern is waste: the least waste, and fewer stockouts than today but more than Balanced." },
@@ -68,19 +60,19 @@ export const HEADS = {
   reports: ["Reports", "Reports", "Ready-made reports to download or print for the owner, the kitchen and the suppliers.", "Reports"],
 };
 
-export const HOW = {
-  today: ["The numbers at the top follow the Period in the filters row; the small line is the trend over the last 12 weeks.", "\"Needs attention\" lists what to act on now. Open Purchasing for the orders and the daily prep list.", "\"Is the plan working?\" compares the recommended plan with the way the restaurant ordered before, on the study's test year (a backtest)."],
-  buy: ["Place each order with the supplier, or buy it at the grocery, then tick it. \"Copy message\" and \"Copy shopping list\" give you text to paste into a chat or notes.", "\"Why?\" on each line explains the order.", "\"Owner priority\" shows what each setting trades off; the orders below follow the plan that is loaded.", "Record what you actually ordered on the Tracking page."],
-  track: ["Each line is one recommended order for the week. Say whether you followed it and how much you really ordered, then save.", "Waste and stockout days are filled in from the records once the week is over.", "The summary compares weeks where the plan was followed with weeks where it was not."],
-  pred: ["\"Next 2 weeks\" is the forecast the purchase plan uses: the last 4 weeks of use and the next 14 days, with the range that is right 4 times out of 5.", "\"Up to 1 year\" gives the monthly forecast for budgeting and supplier planning. Choose 1 month, 3 months, 6 months or 1 year. The weekly order does not use it.", "\"Weather and calendar\" shows whether heat, paydays or holidays change sales."],
-  inv: ["\"Status\" lists the ingredients that may run short or are overstocked first, with what to do.", "\"Running out\" shows one ingredient's stock day by day, with and without the planned orders.", "\"Extra stock\" shows how much money sits in stock the forecast will not use; \"Stockouts\" shows which ingredients ran out most."],
-  waste: ["The charts show where waste comes from: the few ingredients that make up most of it, and spoilage (went bad early) against expiry (kept too long), which are never added together.", "\"Stock by days left\" shows how much stock value expires soon. Alerts for batches close to expiry, with the dishes to push, are sent through Telegram.", "Waste as a share of purchases shows the short-life ingredients lose the most."],
-  reports: ["Pick a report, check the preview, then download it as a spreadsheet (CSV) or print it as a PDF.", "Reports use the Period in the filters row where they cover a period."],
-  sales: ["Choose Day, Week or Month to change the sales chart; grey bars cover only part of a period.", "\"Top dishes\" shows what sells most, which tells you which ingredients to protect.", "\"Ingredient use\" shows the busy weekdays and months; \"Most used\" shows which few ingredients carry most of the value."],
-};
-
 // one fixed colour per year, never shared
-export const YCOL = { 2021: "#94A3B8", 2022: "#10B981", 2023: "#A78BFA", 2024: "#3B82F6", 2025: "#F59E0B", 2026: "#1E3A8A" };
+// sales channels as the point of sale records them, with the name shown and a colour
+export const CHAN = { "Dine-In": ["Dine-in", "var(--accent)"], GrabFood: ["GrabFood delivery", "#10B981"] };
+export const chanName = (c) => (CHAN[c] ? CHAN[c][0] : c);
+export const chanColor = (c, k) => (CHAN[c] ? CHAN[c][1] : ["#7C3AED", "#D97706"][k % 2]);
+export const YCOL = { 2021: "#64748B", 2022: "#059669", 2023: "#7C3AED", 2024: "#2563EB", 2025: "#D97706", 2026: "#1E3A8A" };
+
+// The likely range of the monthly forecast (Forecast > Up to 1 year). Measured, not assumed: for the forecasts made on
+// 8 Sep 2024 and 7 Sep 2025, 1 to 12 months ahead, the actual monthly use of the 20 perishables together, at standard cost, was within
+// 9% of the forecast in 20 of the 24 months. The error did not grow steadily with the months ahead (9.2% one month ahead,
+// 12.7% twelve months ahead, 1% to 5% in most months between), so the range has one width. It was measured for the
+// 20 ingredients together only, so it is not drawn for one ingredient or a smaller group.
+export const LR_BAND = { lo: 0.91, hi: 1.09, inside: 20, of: 24, n: 20 };
 
 export const MODEL_NAMES = {
   HW: "Holt-Winters (7-day season)",

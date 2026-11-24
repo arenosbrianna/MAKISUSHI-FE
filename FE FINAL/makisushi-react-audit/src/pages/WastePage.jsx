@@ -5,11 +5,11 @@ import { D, LAST, BYID, MON, dateOf, dtxt, fd, win, wasteIn, batchesAt, weeksFro
 import { peso, num, pct, sum, qty } from "../lib/format.js";
 import { tabOf } from "../lib/constants.js";
 import { StackCols, HBars, StackH } from "../components/Charts.jsx";
-import { Info, Kpi, Kpis, deltaEl } from "../components/ui.jsx";
+import { Info, Kpi, Kpis, deltaEl, AggSeg } from "../components/ui.jsx";
 import { useApp } from "../AppContext.js";
 
-// buckets for the stacked columns: calendar months (or quarters over two years); a month cut by the period is labelled with its days
-export function wasteBuckets(a, b) {
+// buckets for the stacked columns: calendar months (or quarters or years over two years); a month or year cut by the period is labelled with its days
+export function wasteBuckets(a, b, per = "quarter") {
   const span = b - a + 1;
   if (span <= 125) {   // a short period: one column per day or week
     const bl = bucketsFor(a, b, 14), step = span <= 14 ? 1 : 7;
@@ -20,6 +20,10 @@ export function wasteBuckets(a, b) {
   const startCut = ma.getUTCDate() > 1, endCut = dateOf(b + 1).getUTCDate() !== 1;
   const kf = (i) => {
     const d = dateOf(i), y = d.getUTCFullYear(), m = d.getUTCMonth();
+    if (q && per === "year") {
+      const fromCut = y === ma.getUTCFullYear() && (ma.getUTCMonth() > 0 || startCut), toCut = y === mb.getUTCFullYear() && (mb.getUTCMonth() < 11 || endCut);
+      return String(y) + (fromCut ? ` (from ${ma.getUTCDate()} ${MON[ma.getUTCMonth()]})` : toCut ? ` (to ${mb.getUTCDate()} ${MON[mb.getUTCMonth()]})` : "");
+    }
     if (q) return `${y} Q${Math.floor(m / 3) + 1}`;
     let k = `${MON[m]} ${y}`;
     const first = y === ma.getUTCFullYear() && m === ma.getUTCMonth(), last = y === mb.getUTCFullYear() && m === mb.getUTCMonth();
@@ -56,13 +60,13 @@ function WasteKpis({ F }) {
   const top = Object.entries(byIng).sort((a, b) => b[1] - a[1])[0];
   return (
     <Kpis>
-      <Kpi label="Spoilage · Expiry" value={peso(spo) + " · " + peso(exp)} delta={<span className="t-flat">never added together</span>}
-        info="Spoilage: went bad before its expiry date. Expiry: kept past its shelf life and thrown out. They are never added together." />
+      <Kpi act={{ page: "waste", tab: "when", hint: "By date" }} label="Spoilage · Expiry" value={peso(spo) + " · " + peso(exp)} delta={<span className="t-flat">never added together</span>}
+        info="Spoilage: went bad before expiry. Expiry: kept past its shelf life. Never added together." />
       <Kpi label="Waste" value={peso(wv)} delta={deltaEl(wv, wvP, (v) => peso(v), true)} spark={wks.map((x) => sum(wasteIn(set_, x.a, x.b).map((z) => z[2])))} sparkColor="var(--warn)"
-        info="Recorded waste in pesos in the period. The small line is waste per week over the last 12 weeks." />
+        info="Waste in pesos in the period. Small line: each of the last 12 weeks." />
       <Kpi label="Share of purchases" value={pct(sh, 1)} delta={deltaEl(sh, shP, (v) => (v * 100).toFixed(1), true, " points")}
         info="Waste as a share of what was bought in the period. Lower is better." />
-      <Kpi label="Biggest loss" value={top ? BYID[top[0]].name : "–"} delta={<span className="t-flat">{top ? `${peso(top[1])} · ${pct(wv ? top[1] / wv : 0, 0)} of the waste` : "no waste recorded"}</span>}
+      <Kpi act={{ page: "waste", tab: "when", patch: top ? { ing: +top[0], sel: +top[0] } : {}, hint: "Its records" }} label="Biggest loss" value={top ? BYID[top[0]].name : "–"} delta={<span className="t-flat">{top ? `${peso(top[1])} · ${pct(wv ? top[1] / wv : 0, 0)} of the waste` : "no waste recorded"}</span>}
         info="The ingredient that lost the most value in the period." />
     </Kpis>
   );
@@ -76,14 +80,16 @@ function WasteWhen({ F }) {
   const inPeriod = wasteIn(set_, w.a, w.b);
   const isExp = (x) => /expir/i.test(D.reasons[x[4]] || "");
   const nExp = inPeriod.filter(isExp).length, nSpo = inPeriod.length - nExp;
-  const W = inPeriod.filter((x) => kind === "all" || (kind === "expired" ? isExp(x) : !isExp(x))).sort((a, b) => b[0] - a[0] || b[2] - a[2]);
+  // the total is added in the records' own order, as the cards above add it, so the two always show the same peso
+  const Wk = inPeriod.filter((x) => kind === "all" || (kind === "expired" ? isExp(x) : !isExp(x)));
+  const W = Wk.slice().sort((a, b) => b[0] - a[0] || b[2] - a[2]);
   const reasonName = (x) => { const r = D.reasons[x[4]] || ""; return /expir/i.test(r) ? "Expired" : /spoil/i.test(r) ? "Spoiled" : r[0].toUpperCase() + r.slice(1).replace(/_/g, " "); };
-  const total = sum(W.map((x) => x[2]));
+  const total = sum(Wk.map((x) => x[2]));
   return (
     <div className="panel c12">
       <div className="ph">
         <h2>When it was wasted</h2>
-        <Info t="Each line is one record of the waste log: the day the ingredient was thrown out, why, how much, and what it cost at standard cost. Newest first, for the period and ingredients chosen above. Expired means it was kept past its shelf life; Spoiled means it went bad before then." />
+        <Info t="The waste log, newest first. Expired: kept past its shelf life. Spoiled: went bad before then." />
         <div className="seg noprint" id="wasteseg" role="group" aria-label="Type of waste" style={{ marginLeft: "auto" }}>
           <button aria-pressed={kind === "all"} onClick={() => setKind("all")}>All · {num(inPeriod.length)}</button>
           <button aria-pressed={kind === "spoiled"} onClick={() => setKind("spoiled")}>Spoiled · {num(nSpo)}</button>
@@ -119,7 +125,7 @@ export function WastePage({ F }) {
   const { S, set } = useApp();
   const tab = tabOf("waste", S);
   const w = win(S), set_ = new Set(F.map((i) => i.id)), ids = [...set_];
-  const W = wasteIn(set_, w.a, w.b), bk = wasteBuckets(w.a, w.b);
+  const W = wasteIn(set_, w.a, w.b), bk = wasteBuckets(w.a, w.b, S.agg), longW = Math.round((w.b - w.a) / 30.4) > 24;
   const byIng = {};
   W.forEach((x) => { byIng[x[1]] = (byIng[x[1]] || 0) + x[2]; });
   const ingTot = Object.entries(byIng).map(([id, v]) => [BYID[id].name, v, +id]).sort((a, b) => b[1] - a[1]);
@@ -139,7 +145,8 @@ export function WastePage({ F }) {
   const reasonCol = ["#E0662F", "#2199AD", "#94A3B8", "#10B981", "#A78BFA"];
   const rsn = D.reasons.map((r, k) => ({ name: r[0].toUpperCase() + r.slice(1).replace(/_/g, " "), vals: bk.keys.map(() => 0), color: reasonCol[k % 5] }));
   W.forEach((x) => { if (rsn[x[4]]) rsn[x[4]].vals[bk.of(x[0])] += x[2]; });
-  const rsnUsed = rsn.filter((r) => sum(r.vals) > 0).slice(0, 5);
+  const rsnUsed = rsn.filter((r) => sum(r.vals) > 0).sort((a, b) => (/spoil/i.test(b.name) ? 1 : 0) - (/spoil/i.test(a.name) ? 1 : 0)).slice(0, 5)
+    .map((r) => ({ ...r, color: /spoil/i.test(r.name) ? "#E0662F" : /expir/i.test(r.name) ? "#2199AD" : r.color }));
 
 
   return (
@@ -154,17 +161,17 @@ export function WastePage({ F }) {
           {ingTot.length ? <StackH items={topW.map(([name, , id]) => [name, id])} series={stackW} fmt={(v) => peso(v)} axis={(v) => "₱" + num(v)} label="Waste by ingredient and type" labelWidth={150} onRow={(id) => set({ ing: +id, sel: +id })} /> : <div className="empty">No waste recorded in this period.</div>}
         </div>
         <div className="panel c5">
-          <div className="ph"><h2>Stock by days left, today</h2><Info t={"The value of the stock on hand today, grouped by how many days are left before it expires. Alerts for batches close to expiry are sent through Telegram. " + peso(bucketTotal) + " in stock."} /></div>
+          <div className="ph"><h2>Stock by days left, today</h2><Info t="Stock on hand by days left before expiry. Near-expiry alerts go to Telegram." /></div>
           <HBars fill items={buckets.map((b, k) => [b.label, b.v, k, k === 0 ? "var(--bad)" : k === 1 ? "#F59E0B" : "var(--accent)"])} fmt={(v) => peso(v)} axis={(v) => (v >= 1000 ? "₱" + num(v / 1000) + "k" : "₱" + num(v))} label="Stock value by days left" labelWidth={110} />
         </div>
         <div className="panel c7">
-          <div className="ph"><h2>Spoilage and expiry</h2><Info t="Spoilage: went bad before its expiry date. Expiry: kept past its shelf life and thrown out. They are never added together." /></div>
+          <div className="ph"><h2>Spoilage and expiry</h2>{longW && <AggSeg S={S} set={set} />}<Info t="Spoilage: went bad before expiry. Expiry: kept past its shelf life. Never added together." /></div>
           {rsnUsed.length ? (
             <StackCols keys={bk.keys} series={rsnUsed.map((r) => ({ ...r, name: r.name + " · " + peso(sum(r.vals)) }))} fmt={(v) => peso(v)} axis={(v) => "₱" + num(v)} label="Waste by reason" w={900} />
           ) : <div className="empty">No waste recorded in this period.</div>}
         </div>
         <div className="panel c5">
-          <div className="ph"><h2>Waste as a share of what was bought</h2><Info t="By ingredient. The few short-life ingredients lose the largest share, so the fix is smaller, more frequent deliveries rather than buying less of everything." /></div>
+          <div className="ph"><h2>Waste as a share of what was bought</h2><Info t="Waste as a share of purchases. Short-life items lose most; smaller, more frequent deliveries help." /></div>
           {shareRows.length ? (
             <HBars fill items={shareRows} fmt={(v) => pct(v, 1)} axis={(v) => pct(v, 0)} click label="Waste share of purchases" labelWidth={150} color="var(--warn)"
               onRow={(id) => set({ ing: +id, sel: +id })} />

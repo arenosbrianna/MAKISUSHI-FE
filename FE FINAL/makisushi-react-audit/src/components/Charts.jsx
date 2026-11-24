@@ -50,7 +50,7 @@ export function MiniForecast({ x, act, fc, lo, hi, todayIdx, fmt }) {
         <XAxis dataKey="d" hide />
         <YAxis hide domain={[0, "auto"]} />
         <Tooltip content={<TipBox metas={metas} />} isAnimationActive={false} />
-        <Area dataKey="band" stroke="none" fill="#E8B88A" fillOpacity={0.4} isAnimationActive={false} />
+        <Area dataKey="band" stroke="#B45309" strokeWidth={0.8} strokeDasharray="2 2" fill="#E8B88A" fillOpacity={0.4} isAnimationActive={false} />
         <ReferenceLine x={x[todayIdx]} stroke="#94A3B8" strokeDasharray="3 3" />
         <Line dataKey="act" stroke="#1E3A8A" strokeWidth={1.6} dot={false} isAnimationActive={false} />
         <Line dataKey="fc" stroke="#B45309" strokeWidth={1.8} dot={false} isAnimationActive={false} />
@@ -67,7 +67,7 @@ export function ComboChart({ x, h = 240, bars = [], lines = [], marks = [], shad
     bars.forEach((b, k) => { row[`b${k}`] = b.vals[i]; });
     lines.forEach((l, k) => {
       row[`l${k}`] = l.vals[i];
-      if (l.hi) { row[`lo${k}`] = l.lo[i]; row[`band${k}`] = l.hi[i] - l.lo[i]; }
+      if (l.hi) { const ok = l.hi[i] !== null && l.hi[i] !== undefined && l.lo[i] !== null && l.lo[i] !== undefined; row[`lo${k}`] = ok ? l.lo[i] : null; row[`band${k}`] = ok ? l.hi[i] - l.lo[i] : null; }
     });
     return row;
   });
@@ -97,16 +97,17 @@ export function ComboChart({ x, h = 240, bars = [], lines = [], marks = [], shad
             label={{ value: yband[2], position: "insideTopRight", fill: "var(--good)", fontWeight: 600, fontSize: 11 }} />}
           {refs.map((r, k) => (
             <ReferenceLine key={"r" + k} yAxisId="l" y={r.y} stroke={r.color || "var(--bad)"} strokeDasharray="5 4" strokeWidth={1.4} ifOverflow="extendDomain"
-              label={r.label ? { value: r.label, position: "insideTopRight", fill: r.color || "var(--bad)", fontWeight: 600, fontSize: 11 } : undefined} />
+              label={r.label ? { value: r.label, position: r.labelPos || "insideTopRight", fill: r.color || "var(--bad)", fontWeight: 600, fontSize: 11 } : undefined} />
           ))}
-          {marks.map(([i, lab], k) => (
-            <ReferenceLine key={"m" + k} yAxisId="l" x={x[i]} stroke="var(--accent)" strokeDasharray="2 4" strokeOpacity={0.85}
-              label={{ value: lab, position: "insideTop", fill: "var(--accent)", fontWeight: 700, fontSize: 11 }} />
+          {marks.map(([i, lab, col], k) => (
+            <ReferenceLine key={"m" + k} yAxisId="l" x={x[i]} stroke={col || "var(--accent)"} strokeDasharray={col ? undefined : "2 4"} strokeWidth={col ? 2 : 1} strokeOpacity={0.85}
+              label={{ value: lab, position: "insideTop", fill: col || "var(--accent)", fontWeight: 700, fontSize: 11 }} />
           ))}
           {bars.map((b, k) => (
             <Bar key={"b" + k} yAxisId={axisOf(b)} dataKey={`b${k}`} fill={b.color || "var(--accent)"} fillOpacity={b.op || 1} radius={[3, 3, 0, 0]} isAnimationActive={false}>
               {b.colors && b.colors.map((c, i) => <Cell key={i} fill={c} />)}
-              {b.labels && n <= 12 && (
+              {b.texts && <LabelList dataKey={`b${k}`} content={(p) => { const t = b.texts[p.index]; return t && t[0] ? <text x={p.x + p.width / 2} y={p.y - 6} textAnchor="middle" style={{ fontSize: 10.5, fontWeight: 700, fill: t[1] || "#334155" }}>{t[0]}</text> : null; }} />}
+              {b.labels && (n <= 12 || b.labelsAlways) && (
                 <LabelList dataKey={`b${k}`} position="top" formatter={tf(b.lfmt || yfmt || num)}
                   style={{ fontSize: 10.5, fontWeight: 600, fill: "#334155" }} />
               )}
@@ -116,8 +117,8 @@ export function ComboChart({ x, h = 240, bars = [], lines = [], marks = [], shad
             // Recharts only sees its own components as direct children, so return a flat list (no wrapper elements)
             const yid = axisOf(l), out = [];
             if (l.hi) {
-              out.push(<Area key={`lo${k}`} yAxisId={yid} dataKey={`lo${k}`} stackId={`band${k}`} stroke="none" fill="transparent" isAnimationActive={false} legendType="none" />);
-              out.push(<Area key={`band${k}`} yAxisId={yid} dataKey={`band${k}`} stackId={`band${k}`} stroke="none" fill={l.color} fillOpacity={0.16} isAnimationActive={false} legendType="none" />);
+              out.push(<Area key={`lo${k}`} yAxisId={yid} dataKey={`lo${k}`} stackId={`band${k}`} stroke={l.color} strokeWidth={0.8} strokeDasharray="3 3" fill="transparent" isAnimationActive={false} legendType="none" />);
+              out.push(<Area key={`band${k}`} yAxisId={yid} dataKey={`band${k}`} stackId={`band${k}`} stroke={l.color} strokeWidth={0.8} strokeDasharray="3 3" fill={l.color} fillOpacity={0.16} isAnimationActive={false} legendType="none" />);
             }
             if (l.area) out.push(<Area key={`area${k}`} yAxisId={yid} dataKey={`l${k}`} stroke={l.color} strokeWidth={0} fill={l.color} fillOpacity={0.14} connectNulls={false} dot={false} isAnimationActive={false} legendType="none" />);
             out.push(<Line key={`line${k}`} yAxisId={yid} dataKey={`l${k}`} stroke={l.color} strokeWidth={l.w === undefined ? 2.2 : l.w} strokeOpacity={l.op === undefined ? 1 : l.op}
@@ -265,9 +266,9 @@ export function StackH({ items, series, fmt, axis, label, labelWidth = 150, onRo
 // Diverging horizontal bars: up (good) and down (warn) from a zero line (the original "divbars")
 export function DivBars({ items, label, up = "Up", down = "Down", labelWidth = 190, upColor = "var(--good)", downColor = "var(--warn)", unitFmt, floor = 0.1 }) {
   const n = items.length;
-  const rowH = n > 6 ? 26 : 30, H = 6 + n * rowH + 28;
+  const rowH = n > 8 ? 22 : n > 6 ? 26 : 30, H = 6 + n * rowH + 28;
   const M = niceMax(Math.max(floor, ...items.map((i) => (i[1] === null ? 0 : Math.abs(i[1])))) * 1.35);
-  const lab = unitFmt || ((v) => (v > 0 ? "+" : "") + Math.round(v * 100) + "%");
+  const lab = unitFmt || ((v) => (Math.round(v * 100) > 0 ? "+" : Math.round(v * 100) < 0 ? "−" : "") + Math.abs(Math.round(v * 100)) + "%");
   const data = items.map((i) => ({ name: i[0], v: i[1] === null ? null : i[1] }));
   return (
     <div className="hbars">
@@ -294,9 +295,10 @@ export function DivBars({ items, label, up = "Up", down = "Down", labelWidth = 1
 }
 
 // Diverging columns for months (the original "divcols")
-export function DivCols({ items, label, up = "Up", down = "Down", short = true, h = 270, upColor = "var(--good)", downColor = "var(--warn)" }) {
+// yaxis={false} drops the axis when every column carries its value
+export function DivCols({ items, label, up = "Up", down = "Down", short = true, h = 270, upColor = "var(--good)", downColor = "var(--warn)", yaxis = true }) {
   const M = niceMax(Math.max(0.1, ...items.map((i) => (i[1] === null ? 0 : Math.abs(i[1])))) * 1.35);
-  const lab = (v) => (v === null || v === undefined ? "" : (v > 0 ? "+" : "") + Math.round(v * 100) + "%");
+  const lab = (v) => (v === null || v === undefined ? "" : (Math.round(v * 100) > 0 ? "+" : Math.round(v * 100) < 0 ? "−" : "") + Math.abs(Math.round(v * 100)) + "%");
   const data = items.map((i) => ({ name: short ? i[0].slice(0, 3) : i[0], full: i[0], v: i[1] }));
   return (
     <div className="cwrap">
@@ -304,7 +306,7 @@ export function DivCols({ items, label, up = "Up", down = "Down", short = true, 
         <ResponsiveContainer width="100%" height="100%">
           <BarChart data={data} margin={{ top: 20, right: 10, left: 0, bottom: 4 }} barCategoryGap="30%">
             <XAxis dataKey="name" tick={TICK} tickLine={false} axisLine={false} height={30} />
-            <YAxis domain={[-M, M]} width={46} tick={TICK} tickLine={false} axisLine={false} tickFormatter={tf(lab)} />
+            <YAxis domain={[-M, M]} width={yaxis ? 46 : 0} hide={!yaxis} tick={TICK} tickLine={false} axisLine={false} tickFormatter={tf(lab)} />
             <ReferenceLine y={0} stroke="#94A3B8" />
             <Tooltip cursor={{ fill: "transparent" }} isAnimationActive={false}
               content={({ active, payload }) => (active && payload && payload[0] ? (
@@ -338,7 +340,7 @@ export function Waterfall({ steps, fmt, axis, label, w }) {
       base: b.lo,
       seg: Math.max(1.5, b.hi - b.lo),
       color: tot ? "var(--accent)" : b.s[1] >= 0 ? "var(--good)" : "var(--warn)",
-      txt: (tot ? "" : b.s[1] >= 0 ? "+" : "−") + f(Math.abs(b.s[1])),
+      txt: (tot || /^0(\.0+)?%?$/.test(f(Math.abs(b.s[1]))) ? "" : b.s[1] >= 0 ? "+" : "−") + f(Math.abs(b.s[1])),
       full: `${b.s[0]}: ${f(Math.abs(b.s[1]))}`,
     };
   });
@@ -571,7 +573,7 @@ export function CorrelationBar({ r }) {
 
 // Ring or full pie of 2 to 5 parts (the original "donut")
 // size="auto" fits the ring to the card it sits in (so the card has no empty space); a number is a fixed size in pixels
-export function Donut({ items, pie, colors, fmt, center, sub, label, size = 140 }) {
+export function Donut({ items, pie, colors, fmt, center, sub, label, size = 140, counts }) {
   const auto = size === "auto";
   const box = useRef(null);
   const [dim, setDim] = useState(null);
@@ -608,7 +610,7 @@ export function Donut({ items, pie, colors, fmt, center, sub, label, size = 140 
       </div>
       <ul>
         {data.map((d) => (
-          <li key={d.name}><i style={{ background: d.color }} /><span>{d.name}</span><b>{(d.v / tot * 100).toFixed(1)}%</b></li>
+          <li key={d.name}><i style={{ background: d.color }} /><span className="dn">{d.name}</span><b>{counts ? num(d.v) + " · " + (d.v / tot * 100).toFixed(0) + "%" : (d.v / tot * 100).toFixed(1) + "%"}</b></li>
         ))}
       </ul>
     </div>
@@ -709,7 +711,7 @@ export function TradeoffChart({ frontier, marks = [], h = 330 }) {
       <ResponsiveContainer width="100%" height="100%">
         <ScatterChart margin={{ top: 18, right: 90, bottom: 22, left: 6 }}>
           <XAxis type="number" dataKey="x" tick={TICK} tickLine={false} axisLine={{ stroke: "var(--line)" }} domain={[0, "auto"]} tickFormatter={tf(num)}
-            label={{ value: "Stock-outs over the test year →", position: "insideBottomRight", offset: -14, fill: "#64748B", fontSize: 11 }} />
+            label={{ value: "Stock-outs in a year →", position: "insideBottomRight", offset: -14, fill: "#64748B", fontSize: 11 }} />
           <YAxis type="number" dataKey="y" width={60} tick={TICK} tickLine={false} axisLine={false} domain={[0, "auto"]} tickFormatter={tf(kpeso)}
             label={{ value: "Waste →", angle: -90, position: "insideLeft", offset: 14, fill: "#64748B", fontSize: 11 }} />
           <Tooltip cursor={false} isAnimationActive={false} content={({ active, payload }) => (active && payload && payload[0] ? tipOf(payload[0].payload) : null)} />

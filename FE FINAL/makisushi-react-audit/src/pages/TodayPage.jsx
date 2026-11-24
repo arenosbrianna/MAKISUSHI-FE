@@ -1,17 +1,16 @@
 // Overview: the one-screen summary. Sales, spend and waste over the chosen period, the key takeaways, what needs attention now,
 // the best sellers and whether the plan is working. The orders and the daily prep list are on Purchasing.
 import {
-  D, M, LAST, BYID, D0, win, bucketsFor, dishUnits, IT, series, consumedValue, unmetValue, stockoutSplit, purchaseValue, wasteIn, soIn, wk, weeksFrom, fiso,
-  runOutDay, emergencyValue,
+  D, M, LAST, BYID, D0, win, bucketsFor, partNote, dishUnits, IT, series, consumedValue, unmetValue, stockoutSplit, purchaseValue, wasteIn, soIn, wk, weeksFrom, fiso,
+  runOutDay, emergencyValue, bucketUnit, nextDelivery, isWalkin, dateOf,
 } from "../lib/model.js";
 import { peso, kpeso, num, pct, qty, daysTxt, sum } from "../lib/format.js";
-import { Kpi, Kpis, deltaEl, Chip, Info, Tiles } from "../components/ui.jsx";
+import { Kpi, Kpis, deltaEl, Chip, Info, Tiles, AggSeg } from "../components/ui.jsx";
 import { ComboChart, HBars } from "../components/Charts.jsx";
 import { cleanName } from "../lib/upload.js";
 import { useApp } from "../AppContext.js";
-import { BACKTEST } from "../lib/constants.js";
-import { levelBacktest, levelLabel } from "../lib/model.js";
 import { stockStatus } from "./InvPage.jsx";
+import { readDone } from "./BuyPage.jsx";
 import { buildRecommendations } from "./recommend.js";
 import { useWeather } from "../lib/weather.js";
 
@@ -68,21 +67,21 @@ export function OpsKpis({ F }) {
   const tr = (fn) => wks.map((x) => fn(x.a, x.b));
   return (
     <Kpis>
-      <Kpi label="Ran out" value={num(so)} delta={deltaEl(so, soP, num, true)} goto="inv" onGo={goto}
+      <Kpi act={{ page: "inv", tab: "outs", hint: "Stockouts" }} label="Ran out" value={num(so)} delta={deltaEl(so, soP, num, true)}
         spark={tr((a, b) => soIn(set_, a, b).length)} sparkColor="var(--bad)"
-        info="Times an ingredient ran out of stock in the period. The small line is the count for each of the last 12 weeks." />
-      <Kpi label="Demand served" value={pct(fill, 2)} delta={<span className="t-flat">{num(split.em)} emergency buys · {num(split.lost)} lost sales</span>} goto="inv" onGo={goto}
+        info="Times an ingredient ran out in the period. Small line: each of the last 12 weeks." />
+      <Kpi act={{ page: "inv", tab: "outs", patch: { soView: "lost" }, hint: "Lost sales" }} label="Demand served" value={pct(fill, 2)} delta={<span className="t-flat">{num(split.em)} emergency · {num(split.lost)} lost</span>}
         spark={tr((a, b) => { const s = consumedValue(ids, a, b), l = unmetValue(ids, a, b); return s + l > 0 ? s / (s + l) : 1; })}
-        info="Share of ingredient demand (in pesos, at cost) served from stock. Stock-outs covered by an emergency buy count as served, so their cost is shown beside it." />
-      <Kpi label="Waste" value={peso(wv)} delta={<>{`${pct(pu ? wv / pu : 0)} of purchases · `}{deltaEl(wv, wvP, (v) => peso(v), true)}</>} goto="waste" onGo={goto}
+        info="Share of ingredient demand served from stock. Emergency buys count as served." />
+      <Kpi act={{ page: "waste", tab: "where", hint: "Waste" }} label="Waste" value={peso(wv)} delta={<>{`${pct(pu ? wv / pu : 0)} of purchases · `}{deltaEl(wv, wvP, (v) => peso(v), true)}</>} goto="waste" onGo={goto}
         spark={tr((a, b) => sum(wasteIn(set_, a, b).map((x) => x[2])))} sparkColor="var(--warn)"
-        info="Recorded waste in pesos, and as a share of what was bought in the period. The small line is waste per week." />
-      <Kpi label="Ingredient cost" value={pct(fcost)} delta={<>{"of sales · "}{deltaEl(fcost, fcostP, (v) => (v * 100).toFixed(1), true, " points")}</>} goto="buy" onGo={goto}
+        info="Waste in pesos and as a share of what was bought. Small line: waste per week." />
+      <Kpi act={{ page: "sales", tab: "time", hint: "Ingredient use" }} label="Ingredient cost" value={pct(fcost)} delta={<>{"of sales · "}{deltaEl(fcost, fcostP, (v) => (v * 100).toFixed(1), true, " pts")}</>} goto="buy" onGo={goto}
         spark={tr((a, b) => { const s = salesIn(a, b); return s ? purchaseValue(ids, a, b) / s : 0; })}
-        info="What was spent on these ingredients as a share of sales. Only ingredients that spoil are counted, so this is lower than the full food cost." />
-      <Kpi label="Weekly spend" value={peso(sp)} delta={<>{`${pct(sp / bud, 0)} of ${peso(bud)} budget · `}{deltaEl(sp, spP, (v) => peso(v), true)}</>} goto="buy" onGo={goto}
+        info="Spend on perishable ingredients as a share of sales. ▲ means they took a bigger share of each peso sold." />
+      <Kpi act={{ page: "buy", tab: "plan", hint: "Budget" }} label="Weekly spend" value={peso(sp)} delta={<>{`${pct(sp / bud, 0)} of ${peso(bud)} budget · `}{deltaEl(sp, spP, (v) => peso(v), true)}</>} goto="buy" onGo={goto}
         spark={tr((a, b) => purchaseValue(ids, a, b))}
-        info="Average spend per week on these ingredients at standard cost, against the weekly budget the plan was made for." />
+        info={"Average spend per week, against the weekly budget of " + peso(bud) + "."} />
     </Kpis>
   );
 }
@@ -119,40 +118,55 @@ function attentionItems(F) {
   return out.sort((a, b) => sev[a.lvl] - sev[b.lvl]);
 }
 
-// "Is the plan working?": the recommended Balanced plan against historical ordering on the study's test year (Chapter 4 backtest)
-function PlanWorking() {
-  // the backtest of the service level that is loaded (80%, Balanced, unless another level was chosen on Purchasing)
-  const bt = D.opt.bt || levelBacktest(D.opt.service || 0.8), lvl = D.opt.owner === "min_spoilage" ? "Minimize waste" : D.opt.owner === "max_availability" ? "Maximize availability" : levelLabel(D.opt.service || 0.8);
-  const H = BACKTEST.hist, P = bt ? { episodes: bt.episodes, expiry: bt.expiry, avgStock: bt.avg_stock, fill: bt.fill } : BACKTEST.plan;
-  const row = (label, cur, ref, fmt, lowerBetter) => {
-    const pc = Math.round(Math.abs(cur / ref - 1) * 100), better = lowerBetter ? cur <= ref : cur >= ref;
-    return (
-      <tr key={label}><td>{label}</td><td className="n">{fmt(ref)}</td><td className="n"><b>{fmt(cur)}</b></td>
-        <td className={"n " + (better ? "t-good" : "t-bad")}>{cur <= ref ? "▼" : "▲"} {pc}%</td></tr>
-    );
-  };
+// "Orders this week": the week's purchase plan by supplier, in the order the orders must be placed: order by the first
+// delivery date minus the supplier's lead time, so the order arrives in time ("today" is the latest day of the data)
+const WDS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+const shortDay = (i) => WDS[dateOf(i).getUTCDay()] + " " + dateOf(i).getUTCDate();
+function OrdersThisWeek({ F }) {
+  const { goto, set } = useApp();
+  const idset = new Set(F.map((i) => i.id));
+  const lines = D.plan.filter((p) => p.week === 1 && p.qty > 0 && idset.has(p.ing) && BYID[p.ing]);
+  const market = lines.filter((p) => p.rule === "daily market buy"), orders = lines.filter((p) => p.rule !== "daily market buy");
+  const bySup = {};
+  orders.forEach((p) => { const i = BYID[p.ing]; (bySup[i.sup] || (bySup[i.sup] = { i, rows: [] })).rows.push(p); });
+  const rows = Object.values(bySup).map((g) => {
+    const t = nextDelivery(g.rows.map((p) => p.ing), 1), walk = isWalkin(g.i);
+    const by = t === null ? LAST : Math.max(LAST, t - (walk ? 0 : g.i.lead || 0));
+    return { g, t, walk, by, cost: sum(g.rows.map((p) => p.cost)), done: g.rows.every(readDone) };
+  }).sort((x, y) => x.by - y.by || y.cost - x.cost);
+  const total = sum(lines.map((p) => p.cost)), nDone = rows.filter((r) => r.done).length;
+  const when = (r) => (r.done ? ["good", "Done"] : r.by <= LAST ? ["bad", "Today"] : r.by === LAST + 1 ? ["warn", "Tomorrow"] : ["flat", shortDay(r.by)]);
+  const open = () => { set({ btab: "plan", week: 1 }); goto("buy"); };
   return (
-    <div className="panel c3 fillt">
+    <div className="panel c3">
       <div className="ph">
-        <h2>Is the plan working? <small style={{ fontWeight: 500, color: "var(--muted)" }}>service level {lvl}</small></h2>
-        <Info t={"The plan at this service level (80%, Balanced, is the recommended default) replayed day by day over the test year (" + BACKTEST.period + ") against the same demand as historical ordering. It is a backtest from Chapter 4, not live results. Waste here is stock kept past its shelf life, valued at standard cost; spoilage, the other part of waste (about " + peso(BACKTEST.spoilage) + " a year), is estimated separately and never added to it. Record what you really ordered on the Tracking page to build live evidence."} />
+        <h2>Orders this week</h2>
+        {lines.length > 0 && <Chip cls="flat">{peso(total)}</Chip>}
+        <Info t="Each supplier's order, with the day to place it so it arrives in time." />
       </div>
-      <div className="tablewrap fitc">
-        <table>
-          <thead><tr><th>Backtest</th><th className="n">Before</th><th className="n">Plan</th><th className="n">Change</th></tr></thead>
-          <tbody>
-            {row("Stockout episodes", P.episodes, H.episodes, num, true)}
-            {row("Waste in a year", P.expiry, H.expiry, peso, true)}
-            {row("Average stock held", P.avgStock, H.avgStock, peso, true)}
-            {row("Fill rate", P.fill, H.fill, (v) => pct(v, 1), false)}
-          </tbody>
-        </table>
-      </div>
+      {rows.length || market.length ? (
+        <ul className="attn">
+          {rows.map((r) => { const [c, l] = when(r); return (
+            <li key={r.g.i.sup}>
+              <Chip cls={c}>{l}</Chip>
+              <div><b>{r.g.i.supname}</b><span>{peso(r.cost)}{r.walk ? " · in store" : r.t === null ? "" : " · arrives " + shortDay(r.t)}</span></div>
+            </li>
+          ); })}
+          {market.length > 0 && (
+            <li key="market">
+              <Chip cls="flat">Daily</Chip>
+              <div><b>Market</b><span>{market.map((p) => BYID[p.ing].name.replace(/ \(.*\)$/, "")).join(", ")} · {peso(sum(market.map((p) => p.cost)))}</span></div>
+            </li>
+          )}
+        </ul>
+      ) : <div className="empty">Nothing to order this week.</div>}
+      <div className="legend"><span>{nDone} of {rows.length} placed</span><button className="linkbtn" onClick={open}>Open the order sheet</button></div>
     </div>
   );
 }
 
-// Key insights: one short line each, with a colour for good, warning or bad
+// Key insights: one short line each, with an icon for good (check), watch (warning sign) or act now (exclamation mark)
+const INS_ICON = { good: ["✓", "good"], warn: ["⚠", "watch"], bad: ["!", "act now"], flat: ["i", "note"] };
 function insights(F) {
   const ids = F.map((i) => i.id), set_ = new Set(ids), out = [];
   const short = (n) => n.replace(/ \(.*\)/, "");
@@ -166,7 +180,7 @@ function insights(F) {
   const w28 = wasteIn(set_, LAST - 27, LAST), byI = {};
   w28.forEach((x) => { byI[x[1]] = (byI[x[1]] || 0) + x[2]; });
   const top = Object.entries(byI).sort((x, y) => y[1] - x[1])[0], pu = purchaseValue(ids, LAST - 27, LAST);
-  if (top) out.push({ tone: "warn", text: "Waste " + pct(pu ? sum(w28.map((x) => x[2])) / pu : 0, 1) + " of buys, most from " + short(BYID[top[0]].name) });
+  if (top) out.push({ tone: "warn", text: "Waste " + pct(pu ? sum(w28.map((x) => x[2])) / pu : 0, 1) + " of buys in 4 weeks, most from " + short(BYID[top[0]].name) });
   const bc = D.opt.budget_check;
   if (bc) out.push({ tone: bc.month_total_php > bc.monthly_budget_php ? "bad" : "good", text: (bc.month_total_php > bc.monthly_budget_php ? "Plan is over the monthly budget" : "Plan is within the monthly budget") + " (" + pct(bc.month_total_php / bc.monthly_budget_php, 0) + ")" });
   return out;
@@ -199,7 +213,7 @@ export function TodayPage({ F }) {
   const items = [...attentionItems(F), ...tips];
   const ids = F.map((i) => i.id), set_ = new Set(ids);
   // what was bought and what was thrown away, over the period in the filters row
-  const w = win(S), wks = bucketsFor(w.a, w.b, 14), unit = w.n <= 14 ? "day" : w.n <= 125 ? "week" : w.n > 800 ? "quarter" : "month";
+  const w = win(S), wks = bucketsFor(w.a, w.b, 14, S.agg), unit = bucketUnit(w.n, 14, S.agg), long = w.n > 800;
   const wx = wks.map((x) => x.label);
   const wBuy = wks.map((x) => purchaseValue(ids, x.a, x.b)), wWaste = wks.map((x) => sum(wasteIn(set_, x.a, x.b).map((z) => z[2])));
   // best sellers of the last 4 weeks, against the 4 weeks before
@@ -207,26 +221,15 @@ export function TodayPage({ F }) {
   u1.forEach((q, id) => { if (!IT[id] || IT[id][1] < 0) return; const nm = cleanName(IT[id][0]), o = byName.get(nm) || { q: 0, p: 0 }; o.q += q; byName.set(nm, o); });
   u0.forEach((q, id) => { if (!IT[id]) return; const o = byName.get(cleanName(IT[id][0])); if (o) o.p += q; });
   const best = [...byName.entries()].sort((x, y) => y[1].q - x[1].q).slice(0, 8);
-  const ins = insights(F), tk = tiles(F), wkBudget = wk(M.budget.Base);
+  const ins = insights(F), tk = tiles(F), wkBudget = wk(M.budget.Base), avgName = "average of the last 4 " + unit + "s";
   return (
     <>
       <div className="pb-head">
         <OpsKpis F={F} />
       </div>
       <div className="grid canvas" style={{ gridTemplateRows: "minmax(0, 1.1fr) minmax(0, 1fr)" }}>
-        <div className="panel c6">
-          <div className="ph"><h2>Spend per {unit}</h2><Info t="What was bought in the period chosen above, at standard cost." /></div>
-          <ComboChart x={wx} h={200} yfmt={kpeso} bars={[{ vals: wBuy, color: "var(--accent)", name: "Bought", fmt: peso }]} refs={unit === "week" ? [{ y: wkBudget, label: "", color: "var(--bad)" }] : []} />
-          {unit === "week" && <div className="legend"><span><i style={{ background: "var(--bad)" }} />Weekly budget {kpeso(wkBudget)}</span></div>}
-        </div>
-        <div className="panel c6">
-          <div className="ph"><h2>Waste per {unit}</h2><Info t="The value of what was wasted in the period chosen above, at standard cost. Spoilage and expiry are shown on the Expiry & waste page." /></div>
-          <ComboChart x={wx} h={200} yfmt={kpeso} bars={[{ vals: wWaste, color: "#F2C58B", name: "Waste", fmt: peso }]}
-            lines={[{ vals: wWaste.map((_, k) => (k < 3 ? null : sum(wWaste.slice(k - 3, k + 1)) / 4)), color: "#B45309", name: "4-period average", fmt: peso, w: 2.4, nodots: true }]} />
-          <div className="legend"><span><i style={{ background: "#F2C58B" }} />Waste</span><span><i style={{ background: "#B45309" }} />4-period average</span></div>
-        </div>
         <div className="panel c5">
-          <div className="ph"><h2>Needs attention</h2><Chip cls={items.some((x) => x.lvl === "bad") ? "bad" : items.length ? "warn" : "good"}>{items.length ? `${items.length} items` : "All clear"}</Chip></div>
+          <div className="ph"><h2>Needs attention</h2><Chip cls={items.some((x) => x.lvl === "bad") ? "bad" : items.length ? "warn" : "good"}>{items.length ? [["bad", "act now"], ["warn", "watch"], ["tip", "tips"]].map(([l, w]) => [items.filter((x) => x.lvl === l).length, w]).filter((c) => c[0]).map((c) => c.join(" ")).join(" · ") : "All clear"}</Chip></div>
           {items.length ? (
             <ul className="attn">
               {items.map((x, k) => (
@@ -241,9 +244,22 @@ export function TodayPage({ F }) {
         </div>
         <div className="panel c4">
           <div className="ph"><h2>Key insights</h2></div>
-          <ul className="insights">{ins.map((x, k) => <li key={k} className={x.tone}><i />{x.text}</li>)}</ul>
+          <ul className="insights">{ins.map((x, k) => <li key={k} className={x.tone}><i aria-label={INS_ICON[x.tone][1]}>{INS_ICON[x.tone][0]}</i>{x.text}</li>)}</ul>
         </div>
-        <PlanWorking />
+        <OrdersThisWeek F={F} />
+        <div className="panel c6">
+          <div className="ph"><h2>Spend per {unit}</h2>{long && <AggSeg S={S} set={set} />}<Info t="What was bought in the period chosen above, at standard cost." /></div>
+          <ComboChart x={wx} h={200} yfmt={kpeso} bars={[{ vals: wBuy, color: "var(--accent)", name: "Bought", fmt: peso }]} refs={unit === "week" ? [{ y: wkBudget, label: "", color: "var(--bad)" }] : unit === "month" ? [{ y: M.budget.Base, label: "", color: "var(--bad)" }] : []} />
+          {unit === "week" && <div className="legend"><span><i style={{ background: "var(--bad)" }} />Weekly budget {kpeso(wkBudget)} (each bar is one week)</span>{partNote(wks) && <span>{partNote(wks)}</span>}</div>}
+          {unit === "month" && <div className="legend"><span><i style={{ background: "var(--bad)" }} />Monthly budget {kpeso(M.budget.Base)} (each bar is one month)</span>{partNote(wks) && <span>{partNote(wks)}</span>}</div>}
+          {unit !== "week" && unit !== "month" && partNote(wks) && <div className="legend"><span>{partNote(wks)}</span></div>}
+        </div>
+        <div className="panel c6">
+          <div className="ph"><h2>Waste per {unit}</h2>{long && <AggSeg S={S} set={set} />}<Info t={unit === "year" ? "Waste at standard cost." : "Waste at standard cost. The line averages each bar with the 3 before it."} /></div>
+          <ComboChart x={wx} h={200} yfmt={kpeso} bars={[{ vals: wWaste, color: "#CC7A2E", name: "Waste", fmt: peso }]}
+            lines={unit === "year" ? [] : [{ vals: wWaste.map((_, k) => (k < 3 ? null : sum(wWaste.slice(k - 3, k + 1)) / 4)), color: "#7C2D12", name: avgName, fmt: peso, w: 2.4, nodots: true }]} />
+          <div className="legend"><span><i style={{ background: "#CC7A2E" }} />Waste</span>{unit !== "year" && <span><i style={{ background: "#7C2D12" }} />{avgName[0].toUpperCase() + avgName.slice(1)}</span>}{partNote(wks) && <span>{partNote(wks)}</span>}</div>
+        </div>
       </div>
     </>
   );

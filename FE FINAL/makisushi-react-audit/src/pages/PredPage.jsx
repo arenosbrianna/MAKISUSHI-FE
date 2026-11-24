@@ -1,27 +1,30 @@
 // Forecast: how much of each ingredient will be used. Three tabs:
 //  - Next 2 weeks: the daily forecast the purchase plan uses (14 days), with how far to trust each ingredient
-//  - Up to 1 year: the monthly forecast for budgeting and supplier planning (Chapter 4, Section 4.2.2.6); not used for the weekly order
-//  - Weather and calendar: does heat, a payday or a holiday change sales (Chapter 4, Section 4.2.1.3)
-// The model comparison and accuracy tables are in Chapter 4, not here.
-import { D, N, LAST, MON, XT, BYID, dateOf, fd, fiso, monthsFrom, demandAt, demandValue, yieldOf, dailyDemand, devSeries, pearson } from "../lib/model.js";
+//  - Up to 1 year: the monthly forecast for budgeting and supplier planning; not used for the weekly order
+//  - Weather and calendar: does heat, a payday or a holiday change sales
+import { D, N, LAST, MON, XT, BYID, dateOf, wdOf, fd, fiso, monthsFrom, demandAt, demandValue, yieldOf, dailyDemand, devSeries, pearson, fcRange } from "../lib/model.js";
 import { peso, kpeso, num, pct, qty, sum } from "../lib/format.js";
 import { heatHex, cellOf } from "../lib/color.js";
-import { ComboChart, DivBars, HeatChart, CorrelationBar, HBars, Donut, MiniForecast } from "../components/Charts.jsx";
-import { Kpi, Kpis, Legend, Chip, Info, TabBar, deltaEl } from "../components/ui.jsx";
+import { ComboChart, DivCols, HeatChart, CorrelationBar, HBars, Donut, MiniForecast } from "../components/Charts.jsx";
+import { Kpi, Kpis, Legend, Chip, Info, TabBar, deltaEl, NoteTip } from "../components/ui.jsx";
 import { useWeather } from "../lib/weather.js";
 import { SEASONS, seasonOfIso, nextSeason, seasonImpact, HOT_DAY, RAIN_DAY} from "../lib/seasons.js";
 import { weatherRecs } from "./recommend.js";
 import { useApp } from "../AppContext.js";
-import { MODEL_NAMES } from "../lib/constants.js";
+import { MODEL_NAMES, LR_BAND } from "../lib/constants.js";
 import { UploadForecastPanel } from "./UploadPanels.jsx";
 
 const classOf = (id) => (D.upload.prof[id] && D.upload.prof[id].c) || "";
 const TABS = [["forecast", "Next 2 weeks"], ["byIng", "By ingredient"], ["year", "Up to 1 year"], ["weather", "Weather and calendar"]];
 const HORIZONS = [[1, "1 month"], [3, "3 months"], [6, "6 months"], [12, "1 year"]];
-const mlabel = (ym) => `${MON[+ym.slice(5, 7) - 1]} ${ym.slice(2, 4)}`;
+const mlabel = (ym) => `${MON[+ym.slice(5, 7) - 1]} ${ym.slice(0, 4)}`;
+// the "Not in the forecast" line of both What to expect panels, word for word the same: events the past use cannot show
+const NOT_IN = "new dishes, price changes, supplier stops or typhoon closures";
+// a change said with "about": pesos to the nearest ₱100, quantities to two significant figures
+const aboutQ = (v, single) => { if (!single) return Math.round(v / 100) * 100; if (!v) return 0; const p = 10 ** (Math.floor(Math.log10(Math.abs(v))) - 1); return Math.round(v / p) * p; };
 const horizonText = (n) => (n === 1 ? "month" : n === 12 ? "12 months" : n + " months");
 
-// confidence from how far the weekly forecast missed on the test year (the study's own measure, WMAPE):
+// confidence from how far the weekly forecast missed over the past year (weighted average miss):
 // High up to 25%, Medium up to 40%, Low above that
 export function confidence(id) {
   const p = D.perm && D.perm[id] && D.perm[id][D.engine.model];
@@ -47,9 +50,9 @@ function NextTwoWeeks({ F, tabbar }) {
   const c = (id) => (single ? 1 : BYID[id].cost);
   const nF = D.fdates.length, n14 = Math.min(14, nF);
   const fy = D.fdates.map((_, k) => sum(ids.map((id) => D.fcRaw[id].y[k] * c(id))));
-  const last7 = sum(ids.map((id) => { let v = 0; for (let i = LAST - 6; i <= LAST; i++) v += demandAt(id, i) * c(id); return v; }));
   const next7 = sum(fy.slice(0, 7)), next14 = sum(fy.slice(0, n14));
-  const chg = last7 ? next7 / last7 - 1 : 0;
+  // the same number of days before today, to compare the 14 days of the plan with
+  const lastN = sum(ids.map((id) => { let v = 0; for (let i = LAST - n14 + 1; i <= LAST; i++) v += demandAt(id, i) * c(id); return v; }));
 
   const fmarks = [];
   D.fdates.forEach((_, k) => { const fl = D.ext.ff[k] || 0; if (fl & 2) fmarks.push([k, "Payday"]); else if (fl & 1) fmarks.push([k, "Holiday"]); });
@@ -59,8 +62,13 @@ function NextTwoWeeks({ F, tabbar }) {
   const histX = [...Array.from({ length: HD }, (_, k) => fd(LAST - HD + 1 + k)), ...D.fdates.map(fiso)];
   const histAct = [...hist, ...Array(nF).fill(null)];
   const histFc = [...Array(HD).fill(null), ...fy];
-  const histLo = [...hist, ...D.fdates.map((_, k) => sum(ids.map((id) => D.fcRaw[id].lo[k] * c(id))))];
-  const histHi = [...hist, ...D.fdates.map((_, k) => sum(ids.map((id) => D.fcRaw[id].hi[k] * c(id))))];
+  // the likely range: for one ingredient, the model's own 80% interval; for a total of several, the measured range of the past year
+  // (the model's intervals of single ingredients cannot simply be added)
+  const r1 = single ? null : fcRange(ids, 1), r7 = fcRange(ids, 7), r14 = fcRange(ids, 14);
+  const histLo = [...hist, ...D.fdates.map((_, k) => (r1 ? fy[k] * r1.lo : sum(ids.map((id) => D.fcRaw[id].lo[k] * c(id)))))];
+  const histHi = [...hist, ...D.fdates.map((_, k) => (r1 ? fy[k] * r1.hi : sum(ids.map((id) => D.fcRaw[id].hi[k] * c(id)))))];
+  const rng = (v, r) => (r ? `${f(rnd(v * r.lo))}–${f(rnd(v * r.hi))}` : "–");
+  const rnd = (v) => (single ? v : Math.round(v / 100) * 100);
   const histMarks = [[HD - 1, "Today"], ...fmarks.map(([k, l]) => [k + HD, l])];
 
   // per ingredient: expected use, the range, and how far to trust it
@@ -70,7 +78,7 @@ function NextTwoWeeks({ F, tabbar }) {
   }).filter((r) => r.d14 > 0).sort((a, b) => b.d14 * b.i.cost - a.d14 * a.i.cost);
   const low = rows.filter((r) => r.conf.cls === "bad");
 
-  // one line of accuracy on the test year, from the study's own evaluation
+  // the average weekly miss over the past year
   const ev = F.map((i) => D.perm && D.perm[i.id]).filter(Boolean);
   const wmapeOf = (m) => {
     let a = 0, b = 0;
@@ -99,51 +107,56 @@ function NextTwoWeeks({ F, tabbar }) {
   const supItems = Object.entries(bySup).sort((x, y) => y[1] - x[1]), supTotal = sum(supItems.map((x) => x[1]));
   const stores = ["chilled", "frozen"].map((st) => [st, ids.filter((id) => BYID[id].store === st)]).filter(([, l]) => l.length);
   const topRows = rows.slice(0, 8).map((r) => [r.i.name, single ? r.d14 : r.d14 * r.i.cost, r.i.id]);
-  const confNote = (id) => confidence(id).label;
+  const confNote = (id) => { const r = fcRange([id], 14), row = rows.find((x) => x.i.id === id), v = row ? (single ? row.d14 : row.d14 * row.i.cost) : 0; return r ? "likely " + (single ? qty(v * r.lo, F[0].uom) + "–" + qty(v * r.hi, F[0].uom) : kpeso(v * r.lo) + "–" + kpeso(v * r.hi).slice(1)) : ""; };
 
-  // what to do about it, in a sentence each (the "Recommendations" card)
+  // the forecast as a four-part message a manager can act on: what is expected, how far it can be off,
+  // what the data does not hold, and what to do if the week goes outside it
+  const miss = typeof wm === "number" && wm > 0 ? wm : 0.24;
   const recs = [];
-  recs.push(`Next 7 days: ${f(next7)}, ${chg >= 0 ? "up" : "down"} ${Math.abs(chg * 100).toFixed(0)}% on the last 7 days. ${chg >= 0.05 ? "Check this week's order covers it." : chg <= -0.05 ? "Order a little less." : "Order as usual."}`);
-  if (fmarks.length) recs.push(`${fmarks.map(([k, l]) => `${l} on ${fiso(D.fdates[k])}`).slice(0, 3).join(", ")}: have a little more stock ready.`);
-  if (low.length) recs.push(`Hard to forecast: ${low.slice(0, 3).map((r) => r.i.name).join(", ")}. Keep a bigger cushion.`);
-  if (rows.length && !single) recs.push(`Biggest use: ${rows[0].i.name} (${peso(rows[0].d14 * rows[0].i.cost)}). Check its delivery first.`);
+  // the same four-line form as Up to 1 year: Expected (with the change in pesos or kg), Range ("likely X to Y", as on the cards),
+  // Not in the forecast, and one line for the tab (here the backup plan)
+  const dN = aboutQ(Math.abs(next14 - lastN), single);
+  recs.push({ k: "Expected", t: `${f(next14)} in the next ${n14} days, ${!lastN || !dN ? `about the same as the last ${n14} days` : `about ${f(dN)} ${next14 >= lastN ? "more" : "less"} than the last ${n14} days`}${fmarks.length ? "; " + fmarks.map(([k, l]) => `${l.toLowerCase()} ${fiso(D.fdates[k])}`).slice(0, 2).join(", ") : ""}` });
+  recs.push({ k: "Range", t: r14 ? `likely ${f(rnd(next14 * r14.lo))} to ${f(rnd(next14 * r14.hi))} in the next ${n14} days${low.length ? "; hard to forecast: " + low.slice(0, 3).map((r) => r.i.name.replace(/ \(.*\)$/, "")).join(", ") : ""}` : "not enough past weeks to measure it" });
+  recs.push({ k: "Not in the forecast", t: NOT_IN });
+  recs.push({ k: "Backup plan", t: `if use runs high, buy chilled items the same day at the grocery; test frozen items at +40% on Running out` });
 
   const lineOf = (d, color) => [{ vals: d.act, color: "var(--accent)", name: "What was used", fmt: f }, { vals: d.fc, lo: d.lo, hi: d.hi, color, name: "Forecast", fmt: f }];
   return (
     <>
       <div className="pb-head">
         <Kpis>
-          <Kpi label="Next 7 days" value={f(next7)} delta={<span className="t-flat">{chg >= 0 ? "▲" : "▼"} {Math.abs(chg * 100).toFixed(0)}% vs last 7 days</span>}
-            info="Expected use for the next 7 days, in the amounts taken from stock, compared with what was used in the last 7 days." />
-          <Kpi label={`Next ${n14} days`} value={f(next14)} delta={<span className="t-flat">the purchase-plan window</span>}
-            info="Expected use over the 14 days the purchase plan covers." />
-          <Kpi label="Hard to forecast" value={`${low.length} of ${rows.length}`} delta={<span className="t-flat">low confidence: keep a bigger cushion</span>}
-            info="Ingredients whose weekly forecast missed by more than 40% on the test year. They are used unevenly, so a larger cushion matters more than a better forecast." />
-          {wm !== null && <Kpi label="Weekly WMAPE" value={pct(wm, 1)} delta={<span className="t-flat">test year, weighted by value</span>}
-            info={`Weekly WMAPE of ${MODEL_NAMES[E.model] || E.model} on the study's test year (${E.test}), weighted by the value of each ingredient. The forecast is refitted every week on data before the forecast date only.`} />}
+          <Kpi label="Next 7 days" value={f(next7)} delta={<span className="t-flat">likely {rng(next7, r7)}</span>}
+            info={`Actual use was in this range in ${r7 ? r7.inside : "–"} of ${r7 ? r7.n : "–"} weeks over the past year.`} />
+          <Kpi label={`Next ${n14} days`} value={f(next14)} delta={<span className="t-flat">likely {rng(next14, r14)}</span>}
+            info={`The 14 days the plan covers. Actual use was in this range in ${r14 ? r14.inside : "–"} of ${r14 ? r14.n : "–"} periods over the past year.`} />
+          <Kpi act={{ page: "pred", tab: "byIng", hint: "By ingredient" }} label="Hard to forecast" value={`${low.length} of ${rows.length}`} delta={<span className="t-flat">low confidence: keep a bigger cushion</span>}
+            info="Weekly forecast missed by over 40% in the past year. Keep a bigger cushion for these." />
+          {wm !== null && <Kpi label="Forecast error" value={pct(wm, 1)} delta={<span className="t-flat">average miss per week, past year</span>}
+            info={`A week forecast at ₱10,000 was off by about ${peso(10000 * wm)} either way.`} />}
         </Kpis>
         {tabbar}
       </div>
       <div className="grid canvas" style={{ gridTemplateRows: "minmax(0, 1.25fr) minmax(0, 1fr)" }}>
         <div className="panel c8">
           <div className="ph"><h2>Forecast of total use{single ? " · " + F[0].name : " (₱)"}</h2>
-            <Info t="Both lines are recipe use at the standard cost. Dotted lines mark paydays and holidays. The shaded band is the range the use should fall in 4 times out of 5. The purchase plan covers the first 14 days." /></div>
+            <Info t="Shaded band: where use falls 4 times in 5. Dotted lines: paydays and holidays." /></div>
           <ComboChart x={histX} h={240} yfmt={(q) => (single ? num(q) : kpeso(q))} marks={histMarks} lines={lineOf({ act: histAct, fc: histFc, lo: histLo, hi: histHi }, "var(--warn)")} />
           <Legend items={[["What was used (last 4 weeks)", "var(--accent)"], ["Forecast", "var(--warn)"], ["Likely range", "var(--warn)"]]} />
         </div>
         <div className="panel c4">
-          <div className="ph"><h2>Recommendations</h2></div>
-          <ul className="insights">{recs.map((r, k) => <li key={k} className="flat"><i />{r}</li>)}</ul>
+          <div className="ph"><h2>What to expect</h2><Info t="Likely: where two weeks' use fell 8 times in 10 over the past year." /></div>
+          <ul className="insights">{recs.map((r, k) => <li key={k} className="flat"><i aria-hidden="true">{k + 1}</i><span><b>{r.k}:</b> {r.t}</span></li>)}</ul>
         </div>
         {up && <UploadForecastPanel up={up} />}
         <div className="panel c8">
-          <div className="ph"><h2>Biggest expected use, next {n14} days</h2><Info t="The ingredients with the most use over the 14 days, with how far the forecast can be trusted. Click one to focus on it." /></div>
+          <div className="ph"><h2>Biggest expected use, next {n14} days</h2><Info t="Most use in the next 14 days, with each forecast's likely range. Click one to focus on it." /></div>
           <HBars items={topRows} fmt={single ? (v) => qty(v, F[0].uom) : (v) => peso(v)} axis={single ? num : kpeso} click onRow={(id) => set({ sel: +id, ing: +id })}
             notes={topRows.map((r) => confNote(r[2]))} label="Biggest expected use" labelWidth={130} />
         </div>
         <div className="panel c4">
           <div className="ph"><h2>By supplier, next {n14} days</h2></div>
-          <Donut items={supItems} size="auto" center={kpeso(supTotal)} sub="expected use" label="Expected use by supplier" />
+          <HBars fill items={supItems.map(([n, v]) => [n, v])} fmt={(v) => kpeso(v) + " · " + (supTotal ? (v / supTotal * 100).toFixed(0) : 0) + "%"} axis={kpeso} labelWidth={110} label="Expected use by supplier" />
         </div>
       </div>
     </>
@@ -166,16 +179,16 @@ function ByIngredient({ F }) {
     <div className="grid canvas">
       <div className="panel c12">
         <div className="ph"><h2>Expected use by ingredient: last 3 weeks and next {n14} days</h2></div>
-        <div className="fgrid">
+        <div className={"fgrid" + (rows.length === 1 ? " one" : "")}>
           {rows.length ? rows.map((r) => (
             <button key={r.i.id} type="button" className="fcard" data-t={"Likely range over " + n14 + " days"} onClick={() => set({ sel: r.i.id, ing: r.i.id, ptab: "forecast" })}>
-              <span className="fc-h"><b>{r.i.name}</b><Chip cls={r.conf.cls}>{r.conf.label}</Chip></span>
+              <span className="fc-h"><b title={r.i.name}>{r.i.name.replace(/ \(.*\)$/, "")}</b><Chip cls={r.conf.cls}>{r.conf.label}</Chip></span>
               <span className="fc-c"><MiniForecast x={x} act={r.act} fc={r.fc} lo={r.lo} hi={r.hi} todayIdx={HIST - 1} fmt={(v) => qty(v, r.i.uom)} /></span>
-              <span className="fc-f"><span>7 days <b>{qty(r.d7, r.i.uom)}</b></span><span>{n14} days <b>{qty(r.d14, r.i.uom)}</b></span></span>
+              <span className="fc-f"><span>{n14} days <b>{qty(r.d14, r.i.uom)}</b></span><span>{(() => { const g = fcRange([r.i.id], 14); return g ? "likely " + qty(r.d14 * g.lo, r.i.uom).replace(/ (g|kg|pcs?)$/, "") + "–" + qty(r.d14 * g.hi, r.i.uom) : ""; })()}</span></span>
             </button>
           )) : <div className="empty">No forecast for these ingredients.</div>}
         </div>
-        <div className="legend"><span><i style={{ background: "#1E3A8A" }} />Used</span><span><i style={{ background: "#B45309" }} />Forecast</span><span><i style={{ background: "#E8B88A" }} />Likely range</span></div>
+        <div className="legend"><span><i style={{ background: "#1E3A8A" }} />Used</span><span><i style={{ background: "#B45309" }} />Forecast</span><span><i style={{ background: "#E8B88A" }} />Likely range</span><span data-t="Weekly error up to 25% (High), 25 to 40% (Medium), above 40% (Low)">High / Medium / Low = forecast reliability</span></div>
       </div>
     </div>
   );
@@ -191,9 +204,10 @@ function YearAhead({ F, S, set, tabbar }) {
     return <><div className="pb-head">{tabbar}</div><div className="grid canvas"><div className="panel c12 empty">The 12-month forecast is not loaded. Run scripts/build_long_range.py and restart the server.</div></div></>;
   }
   const ids = F.map((i) => i.id), single = F.length === 1;
+  const band = F.length === LR_BAND.n;   // the range was measured for the 20 perishables together
   const c = (id) => (single ? 1 : BYID[id].cost);
   const f = (v) => (single ? qty(v, F[0].uom) : peso(v));
-  // the monthly model forecasts recipe demand (the warehouse forecast_qty), shown as it is at the standard cost, like Table 4.2.2.6.3 of Chapter 4;
+  // the monthly model forecasts recipe demand (the warehouse forecast_qty), shown as it is at the standard cost;
   // the history is drawn on the same basis (use x yield)
   const qk = (id, k) => (L.qty[id] && L.qty[id][k]) || 0;
   const monthly = (k) => sum(ids.map((id) => qk(id, k) * c(id)));
@@ -203,7 +217,7 @@ function YearAhead({ F, S, set, tabbar }) {
   // the last 12 full months of use, one for each forecast month a year later
   const past = monthsFrom(Math.max(0, LAST - 400), LAST, true).slice(-12);
   const act = past.map((m) => (single ? sum(Array.from({ length: m.b - m.a + 1 }, (_, k) => demandAt(F[0].id, m.a + k))) : demandValue(ids, m.a, m.b)));
-  const pl = (m) => m.label.slice(0, 3) + " " + m.label.slice(-2);
+  const pl = (m) => m.label.slice(0, 3) + " 20" + m.label.slice(-2);
   const x = [...past.map(pl), ...L.months.slice(0, nH).map(mlabel)];
   // the first forecast month is part of a month (it starts on the origin date): scale it to a full month so the line does not dip
   const dim = new Date(Date.UTC(+L.origin.slice(0, 4), +L.origin.slice(5, 7), 0)).getUTCDate(), od = +L.origin.slice(8, 10);
@@ -214,6 +228,8 @@ function YearAhead({ F, S, set, tabbar }) {
   const colors = vals.map((_, k) => (k < act.length ? "var(--accent)" : k === act.length && part0 ? "#F6C28B" : "var(--warn)"));
   const errKey = [1, 3, 6, 12].find((k) => k >= nH) || 12, err = L.error_by_horizon_months[String(errKey)];
   const total = sum(fc.slice(m0, nH)), t1 = fc[0], t3 = sum(fc.slice(0, 3)), t12 = sum(fc);
+  // a total as a likely range: the forecast plus or minus the typical error of each ingredient's total at that horizon (past year)
+  const yr = (v, h) => { const e = L.error_by_horizon_months[h]; return single ? qty(v * (1 - e), F[0].uom).replace(/ (g|kg|pcs?)$/, "") + "–" + qty(v * (1 + e), F[0].uom) : kpeso(v * (1 - e)) + "–" + kpeso(v * (1 + e)).slice(1); };
   // change against the same months a year earlier, leaving out a first month that is only part of a month
   const from = Math.max(m0, part0 ? 1 : 0);
   const cmpF = sum(fc.slice(from, nH)), cmpA = sum(act.slice(from, nH));
@@ -228,22 +244,29 @@ function YearAhead({ F, S, set, tabbar }) {
   }).filter((r) => r.tot > 0).sort((a, b) => b.v - a.v);
 
   const rangeText = m0 === m1 ? "in " + mlabel(L.months[m0]) : mlabel(L.months[m0]) + " to " + mlabel(L.months[m1]);
+  // what to expect over the chosen months, in the same four-line form as the Next 2 weeks tab; the range of the total is the
+  // typical miss of past forecasts for a total of that many months (the same as the cards)
+  const eH = L.error_by_horizon_months, eFor = (n) => (n <= 1 ? eH["1"] : n <= 2 ? eH["2"] : n <= 3 ? eH["3"] : n < 12 ? Math.max(eH["3"], eH["6"]) : eH["12"]);
+  const rndY = (v) => (single ? v : Math.round(v / (v >= 100000 ? 1000 : 100)) * (v >= 100000 ? 1000 : 100));
   const findings = [
-    ["Expected", `${f(total)} ${rangeText}${cmpChg !== null ? `, ${cmpChg >= 0 ? "up" : "down"} ${Math.abs(cmpChg * 100).toFixed(1)}% on a year earlier` : ""}`],
-    ["Peak", elig.length > 1 ? `Peak ${mlabel(L.months[peak])} (${f(fc[peak])}) · low ${mlabel(L.months[quiet])} (${f(fc[quiet])})` : `${mlabel(L.months[m0])}: ${f(fc[m0])}`],
+    ["Expected", `${f(total)} ${m0 === m1 ? "" : "from "}${rangeText}${cmpChg === null ? "" : Math.abs(cmpChg) < 0.005 ? ", about the same as the same months last year"
+      : `, about ${f(aboutQ(Math.abs(cmpF - cmpA), single))} ${cmpF >= cmpA ? "more" : "less"} than the same months last year`}`],
+    ["Range", `likely ${f(rndY(total * (1 - eFor(cnt))))} to ${f(rndY(total * (1 + eFor(cnt))))} ${m0 === m1 ? "" : "from "}${rangeText}`],
+    ["Not in the forecast", NOT_IN],
+    ...(elig.length > 1 ? [["Busiest and quietest", `${mlabel(L.months[peak])} (${f(fc[peak])}) and ${mlabel(L.months[quiet])} (${f(fc[quiet])})`]] : []),
   ];
 
   return (
     <>
       <div className="pb-head">
         <Kpis>
-          <Kpi label="Next month" value={f(t1)} delta={<span className="t-flat">typical error {pct(L.error_by_horizon_months["1"], 1)}</span>} info={`Expected use over the first month (it starts on ${originTxt}).`} />
-          <Kpi label="Next 3 months" value={f(t3)} delta={<span className="t-flat">typical error {pct(L.error_by_horizon_months["3"], 1)}</span>} info="Expected use over the next three months." />
-          <Kpi label="Next 12 months" value={f(t12)} delta={<span className="t-flat">typical error {pct(L.error_by_horizon_months["12"], 1)}</span>} info="Expected use over the next twelve months. Forecasts beyond one year are not supported." />
+          <Kpi label="Next month" value={f(t1)} delta={<span className="t-flat">likely {yr(t1, "1")}</span>} info={`From ${originTxt}. Range: the typical error one month ahead, ${pct(L.error_by_horizon_months["1"], 1)}.`} />
+          <Kpi label="Next 3 months" value={f(t3)} delta={<span className="t-flat">likely {yr(t3, "3")}</span>} info={`Range: the typical error three months ahead, ${pct(L.error_by_horizon_months["3"], 1)}.`} />
+          <Kpi label="Next 12 months" value={f(t12)} delta={<span className="t-flat">likely {yr(t12, "12")}</span>} info={`Range: the typical error twelve months ahead, ${pct(L.error_by_horizon_months["12"], 1)}.`} />
         </Kpis>
         {tabbar}
       </div>
-      <div className="grid canvas" style={{ gridTemplateRows: "minmax(0, 1fr) minmax(0, 1fr)" }}>
+      <div className="grid canvas" style={{ gridTemplateRows: "minmax(0, 1.25fr) minmax(0, 1fr)" }}>
         <div className="panel c8">
           <div className="ph">
             <h2>Monthly use: last 12 months and forecast to {mlabel(L.months[m1])}{single ? " · " + F[0].name : " (₱)"}<small style={{ fontWeight: 500, color: "var(--muted)", marginLeft: 8 }}>made {+L.origin.slice(8, 10)} {MON[+L.origin.slice(5, 7) - 1]} {L.origin.slice(0, 4)}</small></h2>
@@ -253,24 +276,29 @@ function YearAhead({ F, S, set, tabbar }) {
             </div>
           </div>
           <ComboChart x={x} h={200} yfmt={(q) => (single ? num(q) : kpeso(q))} shade={m0 > 0 || m1 < 11 ? [act.length + m0, act.length + m1, ""] : undefined}
-            lines={[{ vals: actLine, color: "var(--accent)", name: "What was used", fmt: f, w: 2.4 }, { vals: fcLine, color: "var(--warn)", name: "Forecast", fmt: f, w: 2.4, dash: true }]} />
-          <Legend items={[["What was used", "var(--accent)"], ["Forecast", "var(--warn)"]]} />
-          <div className="note">At this horizon the total of each ingredient has typically been within {pct(err, 1)} of what was used (test year, Chapter 4). Valued at standard cost.</div>
+            lines={[{ vals: actLine, color: "var(--accent)", name: "What was used", fmt: f, w: 2.4 },
+              band ? { vals: fcLine, lo: fcLine.map((v, k) => (v === null ? null : k < act.length ? v : v * LR_BAND.lo)), hi: fcLine.map((v, k) => (v === null ? null : k < act.length ? v : v * LR_BAND.hi)), color: "var(--warn)", name: "Forecast", fmt: f, w: 2.4, dash: true }
+                : { vals: fcLine, color: "var(--warn)", name: "Forecast", fmt: f, w: 2.4, dash: true }]} />
+          <Legend items={[["What was used", "var(--accent)"], ["Forecast", "var(--warn)"], ...(band ? [["Likely range (±9%)", "#F6C28B"]] : [])]} />
+          {band ? <NoteTip label="How the range was measured" t={`Forecasts made in Sep 2024 and Sep 2025 were within 9% of actual use in ${LR_BAND.inside} of ${LR_BAND.of} months.`} />
+            : <NoteTip label="Why there is no range here" t={`The ±9% range holds for all ${LR_BAND.n} ingredients together. Clear the filters to see it.`} />}
+          <NoteTip t={"Each ingredient's total is typically within " + pct(err, 1) + " of actual use this far ahead."} />
         </div>
-        <div className="panel c4 recbox">
-          <div className="ph"><h2>Recommendations</h2></div>
-          <ul>{findings.map(([h, t], k) => <li key={k}>{t}</li>)}</ul>
+        <div className="panel c4">
+          <div className="ph"><h2>What to expect</h2><Info t="Likely: as close as past forecasts this far ahead usually came." /></div>
+          <ul className="insights">{findings.map(([h, t], k) => <li key={k} className="flat"><i aria-hidden="true">{k + 1}</i><span><b>{h}:</b> {t}</span></li>)}</ul>
         </div>
         <div className="panel c5">
           <div className="ph"><h2>Month by month</h2></div>
           <div className="tablewrap">
             <table>
-              <thead><tr><th>Month</th><th className="n">Expected use</th><th className="n">Same month last year</th></tr></thead>
+              <thead><tr><th>Month</th><th className="n">Expected use</th>{band && <th className="n" data-t="Actual use was within 9% of the forecast in 20 of 24 past months">Likely range</th>}<th className="n">Same month last year</th></tr></thead>
               <tbody>
                 {L.months.slice(m0, nH).map((m, j) => { const k = m0 + j; return (
                   <tr key={m}>
                     <td><b>{mlabel(m)}</b>{k === 0 && part0 ? <small>from {originTxt}</small> : null}</td>
                     <td className="n">{f(fc[k])}</td>
+                    {band && <td className="n t-flat">{kpeso(fc[k] * LR_BAND.lo)}–{kpeso(fc[k] * LR_BAND.hi)}</td>}
                     <td className="n">{k === 0 && part0 ? <span className="t-flat">part month</span> : f(act[k])}</td>
                   </tr>
                 ); })}
@@ -283,20 +311,21 @@ function YearAhead({ F, S, set, tabbar }) {
           <div className="ph"><h2>Expected use by ingredient, {rangeText}</h2></div>
           <div className="tablewrap">
             <table>
-              <thead><tr><th>Ingredient</th><th className="n">Expected use</th><th className="n">Per month</th><th className="n">Value</th></tr></thead>
+              <thead><tr><th>Ingredient</th><th className="n">Expected use</th><th className="n">Per month</th><th className="n">Value</th><th className="n" data-t="Plus or minus the typical error this many months ahead">Likely value</th></tr></thead>
               <tbody>
                 {rows.length ? rows.map((r) => (
                   <tr key={r.i.id} className="click" onClick={() => set({ sel: r.i.id, ing: r.i.id })}>
-                    <td><b>{r.i.name}</b><small>{r.i.store}</small></td>
+                    <td><b>{r.i.name}</b></td>
                     <td className="n">{qty(r.tot, r.i.uom)}</td>
                     <td className="n">{qty(r.per, r.i.uom)}</td>
                     <td className="n">{peso(r.v)}</td>
+                    <td className="n t-flat">{kpeso(r.v * (1 - err))}–{kpeso(r.v * (1 + err)).slice(1)}</td>
                   </tr>
-                )) : <tr><td colSpan={4} className="empty">No forecast for these ingredients.</td></tr>}
+                )) : <tr><td colSpan={5} className="empty">No forecast for these ingredients.</td></tr>}
               </tbody>
             </table>
           </div>
-          <div className="note">Recipe use at the standard cost, as in Chapter 4 (Table 4.2.2.6.3). Monthly Holt-Winters model with a damped trend and a yearly season; sales have been level since 2023, so the forecast is flat rather than growing. Not supported beyond one year.</div>
+          <NoteTip t="Sales have been level since 2023, so the forecast is flat. Up to one year ahead only." />
         </div>
       </div>
     </>
@@ -308,7 +337,7 @@ function YearAhead({ F, S, set, tabbar }) {
 const CLASS_COL = { caution: "#93A4D6", "extreme caution": "#F2B35E", hot: "#E2793A", danger: "#C0392B" };
 const dayColor = (d) => (d.past ? "#CBD5E1" : d.hi == null ? "#CBD5E1" : d.hi >= 42 ? CLASS_COL.danger : d.hi >= HOT_DAY ? CLASS_COL.hot : d.hi >= 33 ? CLASS_COL["extreme caution"] : CLASS_COL.caution);
 const wd = (iso) => ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"][new Date(iso + "T00:00:00Z").getUTCDay()];
-const spct = (v) => (v === null || v === undefined ? "–" : (v >= 0 ? "+" : "−") + Math.abs(Math.round(v * 100)) + "%");
+const spct = (v) => (v === null || v === undefined ? "–" : Math.round(v * 100) === 0 ? "0%" : (v >= 0 ? "+" : "−") + Math.abs(Math.round(v * 100)) + "%");
 // a cell colour for a change in sales: green for more, orange for less, white near zero
 const liftColor = (v) => (v === null || v === undefined ? "#F8FAFC" : Math.abs(v) < 0.03 ? "#F8FAFC" : v > 0 ? `rgba(16,185,129,${Math.min(0.55, 0.12 + v * 1.6)})` : `rgba(245,158,11,${Math.min(0.55, 0.12 - v * 1.6)})`);
 
@@ -317,24 +346,24 @@ function LiveWeatherPanel({ wx, error, loading }) {
   if (loading) return <div className="panel c7 empty">Loading the weather from Open-Meteo…</div>;
   if (!wx) return <div className="panel c7"><div className="ph"><h2>Weather now and ahead</h2></div><div className="empty">The weather service could not be reached{error ? ": " + error : ""}.</div></div>;
   const days = wx.days.filter((d, k) => k >= 5);      // the last 2 days, today and the next 16
-  const next7 = wx.days.filter((d) => !d.past).slice(0, 7);
+  const next7 = wx.days.filter((d) => d.date > wx.today).slice(0, 7);
   const hotN = next7.filter((d) => d.hi != null && d.hi >= HOT_DAY).length;
   const recs = []; weatherRecs(wx, (r) => recs.push(r));
   return (
     <div className="panel c7">
       <div className="ph">
-        <h2>Weather · {wx.location}</h2>
-        <span className="wx-now"><b>{Math.round(wx.now.temp)} °C</b> now · feels <b>{Math.round(wx.now.feels)} °C</b> · humidity <b>{Math.round(wx.now.humidity)}%</b></span>
-        <Info t={"Live from Open-Meteo's forecast service (no key), refreshed every 30 minutes; updated " + new Date(wx.fetched_at).toLocaleString("en", { dateStyle: "medium", timeStyle: "short" }) + ". Bars are the feels-like temperature (heat index) at 2 pm, the same measure as the sales history. PAGASA heat classes: caution below 33 °C, extreme caution 33 to 41 °C, danger 42 °C and above. A day at " + HOT_DAY + " °C or more counts as a hot day for the sales effect. Seasons follow PAGASA's climate types for Metro Manila."} />
+        <h2>{wx.mode === "asof" ? `Weather, ${fiso(wx.today)} and the 14 days of the plan` : "Weather now and the next 14 days"} · {wx.location}</h2>
+        <span className="wx-now">{wx.mode === "asof" ? fiso(wx.today) + " at 2 pm: " : ""}<b>{Math.round(wx.now.temp)} °C</b>{wx.mode === "asof" ? "" : " now"} · feels <b>{Math.round(wx.now.feels)} °C</b> · humidity <b>{Math.round(wx.now.humidity)}%</b></span>
+        <Info t={(wx.mode === "asof" ? "Open-Meteo weather on the data's dates, Quezon City." : "Open-Meteo forecast, Quezon City, updated " + new Date(wx.fetched_at).toLocaleString("en", { dateStyle: "medium", timeStyle: "short" }) + ".") + " Feels-like °C at 2 pm, coloured by PAGASA heat class."} />
       </div>
       <div className="seasonbar">
         {SEASONS.map((s) => <span key={s.key} className={"seasonpill " + s.key + (s.key === cur.key ? " now" : "")} title={s.label + " · " + s.local + " · " + s.months}>{s.key === "summer" ? "Summer" : s.key === "rainy" ? "Rainy" : "Cool dry"} <small>{s.months.replace(" to ", "–").replace("March", "Mar").replace("May", "May").replace("June", "Jun").replace("November", "Nov").replace("December", "Dec").replace("February", "Feb")}</small></span>)}
-        <span className={hotN >= 2 ? "t-bad" : "t-flat"} style={{ marginLeft: "auto", fontSize: 12 }}>{hotN} of the next 7 days at {HOT_DAY} °C or more</span>
+        <span className={hotN >= 2 ? "t-bad" : "t-flat"} style={{ marginLeft: "auto", fontSize: 12 }}>{hotN} of the first 7 days at {HOT_DAY} °C or more</span>
       </div>
       <div className="wxtiles">
-        {wx.days.filter((d) => !d.past).slice(0, 14).map((d) => (
+        {wx.days.filter((d) => d.date > wx.today).slice(0, 14).map((d) => (
           <div key={d.date} className="wxtile" style={{ borderTopColor: dayColor(d) }}>
-            <span>{d.today ? "Today" : wd(d.date) + " " + fiso(d.date)}</span><b>{d.hi == null ? "–" : d.hi.toFixed(0) + "°"}</b><small>{d.rain >= 1 ? d.rain.toFixed(0) + " mm" : "dry"}</small>
+            <span>{wd(d.date) + " " + fiso(d.date)}</span><b>{d.hi == null ? "–" : d.hi.toFixed(0) + "°"}</b><small>{d.rain >= 1 ? d.rain.toFixed(0) + " mm" : "dry"}</small>
           </div>
         ))}
       </div>
@@ -384,10 +413,13 @@ function WeatherPanels({ S, set }) {
   const mean = (arr) => (arr.length ? sum(arr) / arr.length : null);
   const yAll = y.slice(wa, wb + 1).filter((z) => z !== null), yBase = mean(yAll) || 0;
   const days = (fn) => { const o = []; for (let i = wa; i <= wb; i++) if (!(XT.f[i] & 8) && fn(i)) o.push(i); return o; };
-  const wkend = days((i) => XT.f[i] & 4), wkday = days((i) => !(XT.f[i] & 4));
   const eff = (label, idxs) => { const v = idxs.map((i) => y[i]).filter((z) => z !== null); return { label, n: v.length, v: v.length ? mean(v) - yBase : null }; };
-  const wkEff = { label: "Weekend (Sat, Sun)", n: wkend.length, v: mean(wkend.map((i) => a[i])) / mean(wkday.map((i) => a[i])) - 1 };
-  const rows = [eff("Payday", days((i) => XT.f[i] & 2)), eff("Holiday", days((i) => XT.f[i] & 1)), wkEff,
+  // each day of the week against the average day (Saturday and Sunday are not lumped together: Saturday sells about
+  // like an average day, Sunday and Monday are the slowest); paydays and holidays against the same weekday in the nearby weeks
+  const WDN = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
+  const wdMean = WDN.map((_, k) => mean(days((i) => wdOf(i) === k).map((i) => a[i])));
+  const wdAvg = mean(wdMean.filter((v) => v !== null));
+  const rows = [eff("Payday", days((i) => XT.f[i] & 2)), eff("Holiday", days((i) => XT.f[i] & 1)),
     eff("Caution heat (below 33 °C)", days((i) => XT.hi[i] !== null && XT.hi[i] < 33)),
     eff("Extreme caution heat (33 to 41 °C)", days((i) => XT.hi[i] !== null && XT.hi[i] >= 33 && XT.hi[i] < 42)),
     eff("Danger heat (42 °C and above)", days((i) => XT.hi[i] !== null && XT.hi[i] >= 42))];
@@ -406,10 +438,10 @@ function WeatherPanels({ S, set }) {
   const hvOk = hv.filter((v) => v !== null), hmn = hvOk.length ? Math.min(...hvOk) : 0, hmx = hvOk.length ? Math.max(...hvOk) : 1;
   const dvOk = dv.filter((v) => v !== null), dmn = dvOk.length ? Math.min(...dvOk) : 0, dmx = dvOk.length ? Math.max(...dvOk) : 1;
 
-  const heatItems = [["Under 33 °C", rows[3]], ["33 to 41 °C", rows[4]], ["42 °C and up", rows[5]]]
+  const heatItems = [["Under 33 °C", rows[2]], ["33 to 41 °C", rows[3]], ["42 °C and up", rows[4]]]
     .map(([l, q]) => [q.n < 20 || q.v === null ? l + " (few)" : l, q.n < 20 || q.v === null ? null : q.v]);
-  const calItems = [["Payday", rows[0]], ["Holiday", rows[1]], ["Weekend", rows[2]]]
-    .map(([l, q]) => [q.n < 20 || q.v === null ? l + " (few)" : l, q.n < 20 || q.v === null ? null : q.v]);
+  const calItems = WDN.map((nm, k) => [nm, wdMean[k] === null || !wdAvg ? null : wdMean[k] / wdAvg - 1]);
+  const pctS = (v) => (Math.round(v * 100) > 0 ? "+" : Math.round(v * 100) < 0 ? "−" : "") + Math.abs(Math.round(v * 100)) + "%";
   const heatVerdict = Math.abs(r) < 0.1 ? "No link" : r > 0 ? "A little more on hot days" : "A little less on hot days";
 
   return (
@@ -417,15 +449,25 @@ function WeatherPanels({ S, set }) {
       <LiveWeatherPanel wx={wx} error={error} loading={loading} />
       <ImpactPanel from={S.wyear ? wa : undefined} to={S.wyear ? wb : undefined} />
       <div className="panel c4">
-        <div className="ph"><h2>Paydays and holidays</h2><span className="note-inline">net sales · {basis}</span><Info t="Paydays lift use a little and public holidays lower it; both effects are small next to the day-to-day variation, so a payday week needs a little more stock on the payday itself, not a different plan." /></div>
-        <DivBars items={calItems} labelWidth={70} label="Sales on these days compared with other days" up="Sells more" down="Sells less" />
+        <div className="ph"><h2>Busy and slow days</h2><span className="note-inline">vs a usual day · {basis}</span></div>
+        <DivCols items={calItems} yaxis={false} upColor="#2E9E7A" downColor="#D9822B" label="Sales on each day of the week against a usual day" up="Sells more" down="Sells less" />
+        <div className="daypair">
+          {[["Payday", "paydays", rows[0]], ["Holiday", "holidays", rows[1]]].map(([l, pl, q]) => {
+            const few = q.n < 20 || q.v === null;
+            return (
+              <div key={l} className="tile" data-t={few ? `Only ${q.n} ${pl} in this period, too few to measure.` : `${q.n} ${pl}, against the same weekday in the weeks around them.`}>
+                <b>{few ? "–" : pctS(q.v)}</b><span><i style={{ background: few ? "#CBD5E1" : q.v >= 0 ? "#2E9E7A" : "#D9822B" }} />{l}{few ? " (too few)" : ""}</span>
+              </div>
+            );
+          })}
+        </div>
       </div>
       <div className="panel c8">
-        <div className="ph"><h2>Hot and busy months</h2><span className="note-inline">{S.wyear ? S.wyear : "all years"}</span><Info t="Feels-like temperature, the Philippine season and busy-ness (100 = average month) by calendar month. Weather: Open-Meteo, Quezon City." /></div>
+        <div className="ph"><h2>Hot and busy months</h2><span className="note-inline">{S.wyear ? S.wyear : "all years"}</span><Info t="Average feels-like °C, season and sales (100 = an average month) by month." /></div>
         <HeatChart labelWidth={78} rowH={44} cols={MON} rows={[
           { name: "Feels like °C", cells: hv.map((v, m) => (v === null ? cellOf("#E5E7EB", "–", `${MON[m]}: no heat data`) : cellOf(heatHex((v - hmn) / (hmx - hmn || 1)), v.toFixed(0), `${MON[m]}: average heat index ${v.toFixed(1)} °C`))) },
           { name: "PH season", cells: MON.map((_, m) => { const s = seasonOfIso("2026-" + String(m + 1).padStart(2, "0") + "-15"); return cellOf(s.key === "summer" ? "#F6C28B" : s.key === "rainy" ? "#BCD0F0" : "#BFE3DC", s.key === "summer" ? "Hot" : s.key === "rainy" ? "Rain" : "Cool", MON[m] + ": " + s.label); }) },
-          { name: "Busy-ness", cells: dv.map((v, m) => (v === null ? cellOf("#E5E7EB", "–", `${MON[m]}: no sales in this year`) : cellOf(heatHex((v - dmn) / (dmx - dmn || 1)), v.toFixed(0), `${MON[m]}: demand ${v.toFixed(0)} (100 is a typical month)`))) },
+          { name: "Sales (100 = avg)", cells: dv.map((v, m) => (v === null ? cellOf("#E5E7EB", "–", `${MON[m]}: no sales in this year`) : cellOf(heatHex((v - dmn) / (dmx - dmn || 1)), v.toFixed(0), `${MON[m]}: demand ${v.toFixed(0)} (100 is a typical month)`))) },
         ]} />
       </div>
     </>

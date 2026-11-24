@@ -57,6 +57,39 @@ export function phSeason(isoDate) {
 }
 export const heatClass = (hi) => (hi == null ? null : hi >= 42 ? "danger" : hi >= 33 ? "extreme caution" : "caution");
 
+// The weather of the data's own dates: the day of the latest upload and the 14 days of the plan after it. When the data is older
+// than a few weeks these days are in Open-Meteo's archive (what the weather really was); for recent data it is the live forecast.
+const isoAdd = (iso, n) => new Date(Date.UTC(+iso.slice(0, 4), +iso.slice(5, 7) - 1, +iso.slice(8, 10)) + n * 864e5).toISOString().slice(0, 10);
+const asofCache = new Map();
+export async function weatherAt(asof) {
+  const realToday = new Date(Date.now() + 8 * 3600e3).toISOString().slice(0, 10);   // Asia/Manila
+  if (!asof || !/^\d{4}-\d{2}-\d{2}$/.test(asof) || isoAdd(asof, 16) > isoAdd(realToday, -6)) return liveWeather();
+  if (asofCache.has(asof)) return asofCache.get(asof);
+  const lat = process.env.WEATHER_LAT || "14.676";
+  const lon = process.env.WEATHER_LON || "121.0437";
+  const url = `https://archive-api.open-meteo.com/v1/archive?latitude=${lat}&longitude=${lon}&start_date=${isoAdd(asof, -7)}&end_date=${isoAdd(asof, 16)}`
+    + `&hourly=temperature_2m,relative_humidity_2m,apparent_temperature&daily=temperature_2m_max,temperature_2m_min,precipitation_sum&timezone=Asia%2FManila`;
+  const res = await fetch(url, { signal: AbortSignal.timeout(20000) });
+  if (!res.ok) throw new Error(`Open-Meteo returned ${res.status}`);
+  const j = await res.json();
+  const hi = new Map(), at2 = new Map();
+  j.hourly.time.forEach((t, k) => {
+    if (!t.endsWith("T14:00")) return;
+    const tc = j.hourly.temperature_2m[k], rh = j.hourly.relative_humidity_2m[k];
+    if (tc != null && rh != null) { hi.set(t.slice(0, 10), Math.round(heatIndexC(tc, rh) * 10) / 10); at2.set(t.slice(0, 10), { temp: tc, humidity: rh, feels: j.hourly.apparent_temperature[k] }); }
+  });
+  const days = j.daily.time.map((d, k) => ({
+    date: d, tmax: j.daily.temperature_2m_max[k], tmin: j.daily.temperature_2m_min[k], rain: j.daily.precipitation_sum[k],
+    hi: hi.get(d) ?? null, class: heatClass(hi.get(d) ?? null), past: d < asof, today: d === asof,
+  }));
+  const out = {
+    source: "Open-Meteo archive", mode: "asof", location: "Quezon City", fetched_at: new Date().toISOString(), today: asof, season: phSeason(asof),
+    now: at2.get(asof) || { temp: null, humidity: null, feels: null }, days,
+  };
+  asofCache.set(asof, out);
+  return out;
+}
+
 let liveCache = null, liveAt = 0;
 export async function liveWeather() {
   if (liveCache && Date.now() - liveAt < 30 * 60 * 1000) return liveCache;
@@ -81,7 +114,7 @@ export async function liveWeather() {
     hi: hi.get(d) ?? null, class: heatClass(hi.get(d) ?? null), past: d < today, today: d === today,
   }));
   liveCache = {
-    source: "Open-Meteo", location: "Quezon City", fetched_at: new Date().toISOString(), today, season: phSeason(today),
+    source: "Open-Meteo", mode: "live", location: "Quezon City", fetched_at: new Date().toISOString(), today, season: phSeason(today),
     now: { temp: j.current.temperature_2m, humidity: j.current.relative_humidity_2m, feels: j.current.apparent_temperature },
     days,
   };
